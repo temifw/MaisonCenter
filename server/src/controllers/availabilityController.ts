@@ -2,45 +2,43 @@ import type { Request, Response } from "express";
 import { AvailabilityQuerySchema } from "../utils/queryValidators";
 import { findAvailableRooms } from "../services/availabilityService";
 import { computeNights, computeTotalCents } from "../utils/pricing";
+import { validateQuery } from "../utils/validate";
+import { AppError } from "../utils/AppError";
+import { ok } from "../utils/respond";
 
 export async function listAvailableRooms(req: Request, res: Response) {
-  const parsed = AvailabilityQuerySchema.safeParse(req.query);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-
-  const { check_in, check_out, guests } = parsed.data;
+  const { check_in, check_out, guests } = validateQuery(AvailabilityQuerySchema, req);
 
   if (check_out <= check_in) {
-    return res.status(400).json({ error: "check_out must be after check_in" });
+    throw new AppError("check_out must be after check_in", { statusCode: 400, code: "INVALID_DATE_RANGE" });
   }
 
   const nights = computeNights(check_in, check_out);
-  if (nights <= 0) return res.status(400).json({ error: "Invalid date range" });
-
-  try {
-    const rooms = await findAvailableRooms({
-      checkIn: check_in,
-      checkOut: check_out,
-      guests
-    });
-
-    const pricedRooms = rooms.map((r: any) => {
-      const base = r.room_type?.base_price_cents ?? 0;
-      return {
-        ...r,
-        pricing: {
-          nights,
-          base_price_cents: base,
-          total_cents: computeTotalCents(nights, base)
-        }
-      };
-    });
-
-    return res.json({
-      query: { check_in, check_out, guests },
-      pricing: { nights },
-      rooms: pricedRooms
-    });
-  } catch (e: any) {
-    return res.status(500).json({ error: e.message ?? "Server error" });
+  if (nights <= 0) {
+    throw new AppError("Invalid date range", { statusCode: 400, code: "INVALID_DATE_RANGE" });
   }
+
+  const rooms = await findAvailableRooms({ checkIn: check_in, checkOut: check_out, guests });
+
+  const results = rooms.map((r: any) => ({
+    id: r.room_id,
+    room_number: r.room_number,
+    room_type: {
+      id: r.room_type_id,
+      name: r.room_type_name,
+      base_price_cents: r.base_price_cents,
+      max_guests: r.max_guests
+    },
+    pricing: {
+      nights,
+      base_price_cents: r.base_price_cents,
+      total_cents: computeTotalCents(nights, r.base_price_cents)
+    }
+  }));
+
+  return ok(res, {
+    query: { check_in, check_out, guests },
+    pricing: { nights },
+    rooms: results
+  });
 }

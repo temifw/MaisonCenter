@@ -1,7 +1,8 @@
 import { Router } from "express";
-import { createBooking, listRoomTypes } from "../controllers/publicController";
+import { asyncHandler } from "../utils/asyncHandler";
+import { listRoomTypes } from "../controllers/publicController";
 
 export const publicRoutes = Router();
 
-publicRoutes.get("/room-types", listRoomTypes);
-publicRoutes.post("/bookings", createBooking);
+// Public read-only endpoints
+publicRoutes.get("/room-types", asyncHandler(listRoomTypes));
