@@ -1,7 +1,9 @@
 import type { CorsOptions } from "cors";
 
 const allowedOrigins = [
-  "http://localhost:3000"
+  "http://localhost:3000",  // backend
+  "http://localhost:5173",  // admin frontend (Vite dev server)
+  "http://localhost:5174",  // client frontend (Vite dev server)
   // Add production later, e.g. "https://maisoncenter.com"
 ];
 
