@@ -1,31 +1,59 @@
-import { createContext, useState, useContext } from 'react';
-import { authService } from '../services/authService';
+import { createContext, useState, useContext, useEffect, useCallback } from 'react';
+import { authService, type AuthUser } from '../services/authService';
 
 interface AuthContextType {
-  user: any | null;
-  login: (email: string, password: string) => Promise<void>;
+  user: AuthUser | null;
+  loading: boolean;       // true while we hydrate from a stored token
+  isStaff: boolean;
+  login: (email: string, password: string) => Promise<AuthUser>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const login = async (email: string, password: string) => {
-    const response = await authService.login(email, password);
-    const { token, user } = response.data;
+  // On first load (and after full-page navigations) rebuild the session
+  // from the token we stored in localStorage.
+  useEffect(() => {
+    const token = localStorage.getItem('authToken');
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+    authService
+      .getCurrentUser()
+      .then((res) => {
+        const { user, isStaff, role } = res.data;
+        setUser({ ...user, isStaff, role });
+      })
+      .catch(() => {
+        localStorage.removeItem('authToken'); // token invalid/expired
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const login = useCallback(async (email: string, password: string) => {
+    const res = await authService.login(email, password);
+    const { token, user } = res.data;
     localStorage.setItem('authToken', token);
     setUser(user);
-  };
+    return user as AuthUser;
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
+    authService.logout().catch(() => {});
     localStorage.removeItem('authToken');
     setUser(null);
-  };
+    window.location.href = '/sign-in';
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider
+      value={{ user, loading, isStaff: !!user?.isStaff, login, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

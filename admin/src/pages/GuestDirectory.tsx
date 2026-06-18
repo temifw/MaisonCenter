@@ -1,6 +1,25 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { hotelService, type Guest } from '../services/hotelService';
 
 const GuestDirectory: React.FC = () => {
+  const [guests, setGuests] = useState<Guest[]>([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  // Debounced search against GET /guests?search=
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    const t = setTimeout(() => {
+      hotelService
+        .getGuests(search)
+        .then((res) => { if (active) setGuests(res.data); })
+        .catch(() => { if (active) setGuests([]); })
+        .finally(() => { if (active) setLoading(false); });
+    }, 250);
+    return () => { active = false; clearTimeout(t); };
+  }, [search]);
+
   return (
     <div className="bg-surface text-on-surface min-h-screen flex">
       {/* SideNavBar */}
@@ -52,7 +71,7 @@ const GuestDirectory: React.FC = () => {
           <div className="flex items-center gap-4 flex-1">
             <div className="relative w-full max-w-md">
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg">search</span>
-              <input className="w-full bg-surface-container-low border-none rounded-full py-2 pl-10 pr-4 text-body-md focus:ring-2 focus:ring-blue-700/20" placeholder="Search guests, bookings, or rooms..." type="text" />
+              <input className="w-full bg-surface-container-low border-none rounded-full py-2 pl-10 pr-4 text-body-md focus:ring-2 focus:ring-blue-700/20" placeholder="Search guests by name, email, or phone..." type="text" value={search} onChange={(e) => setSearch(e.target.value)} />
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -100,11 +119,8 @@ const GuestDirectory: React.FC = () => {
             <div className="bg-white p-6 rounded-xl shadow-sm border border-surface-container-high flex flex-col gap-2">
               <span className="text-label-bold text-secondary-fixed-variant uppercase tracking-widest">Total Guests</span>
               <div className="flex items-end justify-between">
-                <span className="text-h1 font-h1 text-primary">2,842</span>
-                <span className="text-body-sm text-green-600 font-bold flex items-center gap-1">
-                  <span className="material-symbols-outlined text-sm">trending_up</span>
-                  12%
-                </span>
+                <span className="text-h1 font-h1 text-primary">{loading ? '—' : guests.length.toLocaleString()}</span>
+                <span className="text-body-sm text-secondary font-medium">In directory</span>
               </div>
             </div>
             <div className="bg-white p-6 rounded-xl shadow-sm border border-surface-container-high flex flex-col gap-2">
@@ -145,7 +161,7 @@ const GuestDirectory: React.FC = () => {
                 </div>
               </div>
               <div className="text-body-sm text-secondary">
-                Showing 1-10 of 2,842 guests
+                {loading ? 'Loading…' : `Showing ${guests.length} guest${guests.length === 1 ? '' : 's'}`}
               </div>
             </div>
             <div className="overflow-x-auto">
@@ -161,145 +177,55 @@ const GuestDirectory: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-container">
-                  {/* Row 1 */}
-                  <tr className="hover:bg-blue-50/30 transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <img alt="Guest" className="w-10 h-10 rounded-full border border-surface-container-highest" data-alt="A portrait of a elegant woman with a warm, professional smile, set against a soft-focus minimalist background. The lighting is natural and bright, echoing a light-mode high-end aesthetic. She represents a premium corporate client, with the image styled in a modern, clean digital format suitable for a luxury stay property management system." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCnOeFal1ZKIXoi2C0qbl_jPafbPxG5hBfMS1aOu2ApgjNotGtwCxsYnukDfNEDYwkfjJ8fl_L--_eMzTkbcUdB0dT0BqvQ4TKRuqzA7zplqrncexORvFo8k8HAQDz4E-v34dx23pjDxegjtEB3ctFAVrkOB20Tl2LBZFRRyuZfq77omZ4lQNE8-oks56C-g0DbuEFbH-32yj_1iQHdtFOaiQmsSu_cUhy6N5ovWUZUQJlC8ZEv497QDDqJoikSAXrxCvSLAnwzP8w" />
-                        <div>
-                          <p className="font-data-tabular text-primary font-bold">Alexandra Sterling</p>
-                          <p className="text-body-sm text-blue-600 font-medium">VIP Gold Member</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="text-body-md text-primary">a.sterling@corporate.com</span>
-                        <span className="text-body-sm text-secondary">+1 (555) 012-3456</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800">
-                        Active
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-body-md text-secondary">
-                      Oct 12, 2023
-                    </td>
-                    <td className="px-6 py-4 font-data-tabular text-primary font-bold">
-                      $14,250.00
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button className="px-4 py-1.5 text-blue-700 border border-blue-700 rounded-lg text-body-sm font-bold hover:bg-blue-700 hover:text-white transition-all">
-                        View Profile
-                      </button>
-                    </td>
-                  </tr>
-                  
-                  {/* Row 2 */}
-                  <tr className="hover:bg-blue-50/30 transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <img alt="Guest" className="w-10 h-10 rounded-full border border-surface-container-highest" data-alt="A portrait of a professional man in a tailored charcoal sweater, looking towards the camera with a friendly and reliable expression. The background is a blurred high-end interior with soft architectural lighting that complements the clean, corporate design system. The overall mood is sophisticated and modern, reflecting the reliability of the property management brand." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAQ50VRh6tbaLw2A0PoS7kiOFHvv3ZZ7OwJ84iQdekn8W6K3poZE9LyhHIQEeRlQqryw8_MqQGtE8E_0EnegOmhvZVgZci0joznFovy0fG3E3fwj2I3kqmec5jJADdc4b9vVpYwlROOjR2hPMDkc-I2d8qRI56U_zXsYztWdnLuSHA7aA7fZhaPfrY7r6BJOPBxUZX0VNz2NkF3w4M17nfYLiGaoVJj4hI2Wl5Ue3HOuZAP7JCBhX_tLcPUrnE249ANA01Q3tjN7cg" />
-                        <div>
-                          <p className="font-data-tabular text-primary font-bold">Marcus Thorne</p>
-                          <p className="text-body-sm text-secondary">Regular Guest</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="text-body-md text-primary">m.thorne@techflow.io</span>
-                        <span className="text-body-sm text-secondary">+1 (555) 987-6543</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-800">
-                        Checked Out
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-body-md text-secondary">
-                      Nov 02, 2023
-                    </td>
-                    <td className="px-6 py-4 font-data-tabular text-primary font-bold">
-                      $4,820.00
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button className="px-4 py-1.5 text-blue-700 border border-blue-700 rounded-lg text-body-sm font-bold hover:bg-blue-700 hover:text-white transition-all">
-                        View Profile
-                      </button>
-                    </td>
-                  </tr>
-
-                  {/* Row 3 */}
-                  <tr className="hover:bg-blue-50/30 transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <img alt="Guest" className="w-10 h-10 rounded-full border border-surface-container-highest" data-alt="A close-up studio portrait of a woman with a confident, serene expression. She is wearing a modern silk blouse in a soft pastel tone. The image is bathed in high-key, even lighting that matches a light-mode UI aesthetic perfectly. The background is a solid, neutral grey, maintaining a clean and premium corporate profile look for a luxury digital interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDwRXXFxgbUNXpp0zrGprPiBm4_YZOHq-yvZhIVzpRbiHDiU6oQNWLlTSot1igb4cNd8vl4Ta2Cm-K-hSQZ4OUwaEhYhsBdHRXwRes6JYGMna5Vh0rBwO1aT71qre9OhcE0c4JgRtagbBVFUScIB8oWYT_UvyFTvWz2po-YtMvG3yEuXw3uUSFWdf8Tuu1Q8GvBho9wyE5uRWO5h5bAtUPSuYt4RxZllYPtGRm6OYXqhQQVWsGjrYsiJiZrKFUGWaKBgUY1zs9oTDQ" />
-                        <div>
-                          <p className="font-data-tabular text-primary font-bold">Elena Rodriguez</p>
-                          <p className="text-body-sm text-blue-600 font-medium">VIP Silver Member</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="text-body-md text-primary">elena.rod@globalres.com</span>
-                        <span className="text-body-sm text-secondary">+34 912 345 678</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800">
-                        Reserved
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-body-md text-secondary">
-                      Aug 24, 2023
-                    </td>
-                    <td className="px-6 py-4 font-data-tabular text-primary font-bold">
-                      $8,150.00
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button className="px-4 py-1.5 text-blue-700 border border-blue-700 rounded-lg text-body-sm font-bold hover:bg-blue-700 hover:text-white transition-all">
-                        View Profile
-                      </button>
-                    </td>
-                  </tr>
-
-                  {/* Row 4 */}
-                  <tr className="hover:bg-blue-50/30 transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <img alt="Guest" className="w-10 h-10 rounded-full border border-surface-container-highest" data-alt="A portrait of a male professional with short hair and a neat beard, wearing a high-quality light blue shirt. He has a neutral, authoritative yet approachable expression. The lighting is diffused and bright, creating a crisp, clean light-mode aesthetic. The background is a minimalist blurred office hallway with soft blue and white tones, ensuring visual consistency with the modern corporate UI." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC-dbd4tUjlOQA6-jRcv4Wx9q2HTBy7CtA5unEo0890fRSlqDybHePN3kAi5C3lEkIbq3wsVJiIWW1FIrAJBest_LbAI8Xgf5RGW_teu_Z1bJvfMds-nzyIXOQ-oseOLvcdkpnTRRUF9CQLxrdjLjDuD_QeHRKPw6OWSdWTSZYFMdF4OUIc-8W9vxvHaJv-lhFsOrCLMWcTmXcDBRwiZEBy1nZtbxlvfbvX1WCq_FZNa0X6E6sEpOjLEv32MC1V18WU0swRengBSMQ" />
-                        <div>
-                          <p className="font-data-tabular text-primary font-bold">Julian Vane</p>
-                          <p className="text-body-sm text-secondary">New Guest</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="text-body-md text-primary">j.vane@creative.studio</span>
-                        <span className="text-body-sm text-secondary">+1 (555) 444-3322</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800">
-                        Active
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-body-md text-secondary">
-                      Nov 15, 2023
-                    </td>
-                    <td className="px-6 py-4 font-data-tabular text-primary font-bold">
-                      $2,100.00
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button className="px-4 py-1.5 text-blue-700 border border-blue-700 rounded-lg text-body-sm font-bold hover:bg-blue-700 hover:text-white transition-all">
-                        View Profile
-                      </button>
-                    </td>
-                  </tr>
+                  {loading && (
+                    <tr><td className="px-6 py-8 text-center text-secondary" colSpan={6}>Loading guests…</td></tr>
+                  )}
+                  {!loading && guests.length === 0 && (
+                    <tr><td className="px-6 py-8 text-center text-secondary" colSpan={6}>No guests found.</td></tr>
+                  )}
+                  {!loading && guests.map((guest) => {
+                    const initials = guest.full_name
+                      .split(' ')
+                      .map((p) => p[0])
+                      .slice(0, 2)
+                      .join('')
+                      .toUpperCase();
+                    return (
+                      <tr className="hover:bg-blue-50/30 transition-colors group" key={guest.id}>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center font-bold text-body-sm">
+                              {initials || '?'}
+                            </div>
+                            <div>
+                              <p className="font-data-tabular text-primary font-bold">{guest.full_name}</p>
+                              <p className="text-body-sm text-secondary">Guest</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="text-body-md text-primary">{guest.email || '—'}</span>
+                            <span className="text-body-sm text-secondary">{guest.phone || '—'}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800">
+                            Active
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-body-md text-secondary">
+                          {guest.created_at ? new Date(guest.created_at).toLocaleDateString() : '—'}
+                        </td>
+                        <td className="px-6 py-4 font-data-tabular text-primary font-bold">—</td>
+                        <td className="px-6 py-4 text-right">
+                          <button className="px-4 py-1.5 text-blue-700 border border-blue-700 rounded-lg text-body-sm font-bold hover:bg-blue-700 hover:text-white transition-all">
+                            View Profile
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

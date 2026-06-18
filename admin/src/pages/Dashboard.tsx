@@ -1,6 +1,20 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { hotelService, type DashboardStats, type Booking } from '../services/hotelService';
 
 const Dashboard: React.FC = () => {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [inHouse, setInHouse] = useState<Booking[]>([]);
+
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    hotelService.getDashboard().then((r) => setStats(r.data)).catch(() => {});
+    hotelService.getCalendar(today, today).then((r) => setInHouse(r.data)).catch(() => {});
+  }, []);
+
+  const total = stats?.rooms.total ?? 0;
+  const occupied = stats?.rooms.byStatus.occupied ?? 0;
+  const occupancyRate = total ? Math.round((occupied / total) * 100) : 0;
+
   return (
     <div className="bg-background text-on-background antialiased min-h-screen">
       {/* SideNavBar Shell */}
@@ -107,9 +121,9 @@ const Dashboard: React.FC = () => {
                 </span>
               </div>
               <p className="font-label-bold text-label-bold text-secondary uppercase tracking-wider mb-xs">Occupancy Rate</p>
-              <h3 className="font-h1 text-h1 text-primary">85%</h3>
+              <h3 className="font-h1 text-h1 text-primary">{occupancyRate}%</h3>
               <div className="mt-md w-full bg-surface-container rounded-full h-1.5 overflow-hidden">
-                <div className="bg-blue-700 h-full w-[85%]"></div>
+                <div className="bg-blue-700 h-full" style={{ width: `${occupancyRate}%` }}></div>
               </div>
             </div>
 
@@ -136,8 +150,8 @@ const Dashboard: React.FC = () => {
                 </div>
                 <span className="text-secondary text-xs font-medium">Today</span>
               </div>
-              <p className="font-label-bold text-label-bold text-secondary uppercase tracking-wider mb-xs">Upcoming Arrivals</p>
-              <h3 className="font-h1 text-h1 text-primary">12</h3>
+              <p className="font-label-bold text-label-bold text-secondary uppercase tracking-wider mb-xs">Arrivals Today</p>
+              <h3 className="font-h1 text-h1 text-primary">{stats?.arrivalsToday ?? 0}</h3>
               <div className="flex mt-md -space-x-2">
                 <div className="w-8 h-8 rounded-full border-2 border-white bg-slate-200"></div>
                 <div className="w-8 h-8 rounded-full border-2 border-white bg-slate-300"></div>
@@ -257,15 +271,15 @@ const Dashboard: React.FC = () => {
                 <div className="flex gap-4">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                    <span className="text-xs font-medium text-secondary">Available (42)</span>
+                    <span className="text-xs font-medium text-secondary">Available ({stats?.rooms.byStatus.available ?? 0})</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                    <span className="text-xs font-medium text-secondary">Occupied (112)</span>
+                    <span className="text-xs font-medium text-secondary">Occupied ({occupied})</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-orange-400"></span>
-                    <span className="text-xs font-medium text-secondary">Cleaning (8)</span>
+                    <span className="text-xs font-medium text-secondary">Cleaning ({stats?.rooms.byStatus.cleaning ?? 0})</span>
                   </div>
                 </div>
               </div>
@@ -282,42 +296,25 @@ const Dashboard: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="text-sm divide-y divide-surface-variant/50">
-                    <tr className="hover:bg-surface transition-colors">
-                      <td className="py-md font-bold text-primary">101</td>
-                      <td className="py-md text-secondary">Deluxe King</td>
-                      <td className="py-md text-primary">Marcus Aurelius</td>
-                      <td className="py-md text-secondary">Oct 22 - Oct 26</td>
-                      <td className="py-md">
-                        <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700">OCCUPIED</span>
-                      </td>
-                      <td className="py-md text-right">
-                        <button className="p-1 hover:text-primary-container"><span className="material-symbols-outlined text-sm">more_horiz</span></button>
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-surface transition-colors bg-surface/30">
-                      <td className="py-md font-bold text-primary">102</td>
-                      <td className="py-md text-secondary">Superior Twin</td>
-                      <td className="py-md text-secondary">—</td>
-                      <td className="py-md text-secondary">—</td>
-                      <td className="py-md">
-                        <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-green-50 text-green-700">AVAILABLE</span>
-                      </td>
-                      <td className="py-md text-right">
-                        <button className="p-1 hover:text-primary-container"><span className="material-symbols-outlined text-sm">more_horiz</span></button>
-                      </td>
-                    </tr>
-                    <tr className="hover:bg-surface transition-colors">
-                      <td className="py-md font-bold text-primary">103</td>
-                      <td className="py-md text-secondary">Executive Suite</td>
-                      <td className="py-md text-primary">Elena Gilbert</td>
-                      <td className="py-md text-secondary">Oct 20 - Oct 24</td>
-                      <td className="py-md">
-                        <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-orange-50 text-orange-700">DUE OUT</span>
-                      </td>
-                      <td className="py-md text-right">
-                        <button className="p-1 hover:text-primary-container"><span className="material-symbols-outlined text-sm">more_horiz</span></button>
-                      </td>
-                    </tr>
+                    {inHouse.length === 0 && (
+                      <tr><td className="py-md text-secondary" colSpan={6}>No active bookings for today.</td></tr>
+                    )}
+                    {inHouse.map((b) => (
+                      <tr className="hover:bg-surface transition-colors" key={b.id}>
+                        <td className="py-md font-bold text-primary">{b.rooms?.room_number ?? '—'}</td>
+                        <td className="py-md text-secondary">{b.rooms?.room_types?.name ?? '—'}</td>
+                        <td className="py-md text-primary">{b.guests?.full_name ?? '—'}</td>
+                        <td className="py-md text-secondary">
+                          {new Date(b.check_in).toLocaleDateString()} - {new Date(b.check_out).toLocaleDateString()}
+                        </td>
+                        <td className="py-md">
+                          <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 uppercase">{b.status}</span>
+                        </td>
+                        <td className="py-md text-right">
+                          <a className="p-1 hover:text-primary-container" href="/calendar"><span className="material-symbols-outlined text-sm">more_horiz</span></a>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>

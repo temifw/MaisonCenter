@@ -1,34 +1,61 @@
-import type { FormEvent } from 'react'
-
-const roomOptions = [
-  {
-    alt: 'Deluxe King Room',
-    checked: true,
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCnmpa8BlRyTr64w0abS3pcmAOB0EQ6jtn3kiIJh2uqud42jOobgq4AowENRh9LQ8RCkfxSmKD0dtNs_xvIoZOoNQZxuE0phwiiFui_Lc0hs5mg-LeyKVNyqY2QwoJd1rokyo3cAeH4DdqE3c2OEiaIYvM2LYcbvxtepurmo5MxEHOF5cd7Yuad9ixfkj4kOHBK2zycroBSLstgclzqlnCwe_spqkChs_si5rc1WhKx8zVUWLpfqEdv-9-9v-VrWuCNGZjtNAkUcSk',
-    meta: '45 m² • City View',
-    name: 'Deluxe King',
-    price: '$249',
-  },
-  {
-    alt: 'Executive Suite',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAk-1SgNDmRVdZHcvpuYPyEGQeQKVAzviKZ0zLMh7ZVZuLVNDYt0-smR2bL25Wk_NoIjzImUIyCEEes0JvAWbXt74fIQ0XVsZQVvXuGTUUN1ybcbYLu4D1zZ9PGtRaSDolEnuPPuXBa5Kyw13ndFNaUaGsDIksDZ9dRxsLQOBkOKcGryGZoSV0pWaMwdS8kcuqsgAv3qIahDzhUmS9ecfNKCujBxI4MEpz2Ef0aLpQJWAbxovizyHW-XDVG-_TQiP-FeURBr-qw0GY',
-    meta: '72 m² • Terrace',
-    name: 'Executive Suite',
-    price: '$480',
-  },
-  {
-    alt: 'Junior Twin Room',
-    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBUMT5L2zjSCPpcb7H9RGMfKaTK2eEouLHKFhTUPeTuwycwonkdfSEUeFPSkqmGnvPvE_jzUxuFWmsxZ2XqrGB_eNjXRQoA6O3LASAWw74CM05KHwzs6V2VwNAi2V0iWYKTUcAJiQeYw5NQFMhaz_zntzuutuTArWt7Bv9BiIKs0-7RAJJVA90KJAbezpHxQel6UMElVrCrQ7Iosgo8hfg9wirtrBShj6NLypGAurgHgqZvFDZbSWb-LNvEDXkKpMYoPj3z5o_o4qM',
-    meta: '38 m² • Courtyard',
-    name: 'Junior Twin',
-    price: '$185',
-  },
-]
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { hotelService, type RoomType } from '../services/hotelService'
 
 const NewBooking = () => {
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const [roomTypes, setRoomTypes] = useState<RoomType[]>([])
+  const [roomTypeId, setRoomTypeId] = useState('')
+  const [guestName, setGuestName] = useState('')
+  const [guestEmail, setGuestEmail] = useState('')
+  const [guestPhone, setGuestPhone] = useState('')
+  const [checkIn, setCheckIn] = useState('')
+  const [checkOut, setCheckOut] = useState('')
+  const [adults, setAdults] = useState(2)
+  const [notes, setNotes] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    hotelService.getRoomTypes().then((res) => {
+      setRoomTypes(res.data)
+      if (res.data[0]) setRoomTypeId(res.data[0].id)
+    }).catch(() => setRoomTypes([]))
+  }, [])
+
+  const selectedType = roomTypes.find((t) => t.id === roomTypeId)
+  const nights = useMemo(() => {
+    if (!checkIn || !checkOut) return 0
+    const ms = new Date(checkOut).getTime() - new Date(checkIn).getTime()
+    return ms > 0 ? Math.round(ms / 86400000) : 0
+  }, [checkIn, checkOut])
+  const roomTotal = selectedType ? Number(selectedType.base_price) * nights : 0
+  const serviceFee = roomTotal ? 45 : 0
+  const tax = +(roomTotal * 0.12).toFixed(2)
+  const total = +(roomTotal + serviceFee + tax).toFixed(2)
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    window.location.href = '/booking-confirmation'
+    setError(null)
+    if (!roomTypeId) return setError('Please select a room type.')
+    if (nights <= 0) return setError('Check-out must be after check-in.')
+    setSubmitting(true)
+    try {
+      const res = await hotelService.createBooking({
+        roomTypeId,
+        checkIn,
+        checkOut,
+        guestName,
+        guestEmail: guestEmail || undefined,
+        guestPhone: guestPhone || undefined,
+        guestsCount: adults,
+        specialRequests: notes || undefined,
+        source: 'walk_in',
+      })
+      window.location.href = `/booking-confirmation?id=${res.data.id}`
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Could not create the booking.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -121,7 +148,7 @@ const NewBooking = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-md">
                   <div className="space-y-xs">
                     <label className="block font-label-bold text-label-bold text-on-surface-variant" htmlFor="guest-name">FULL NAME</label>
-                    <input className="w-full border-outline-variant rounded-lg focus:ring-primary focus:border-primary font-body-md text-body-md" id="guest-name" placeholder="e.g. Jonathan Doe" type="text" />
+                    <input className="w-full border-outline-variant rounded-lg focus:ring-primary focus:border-primary font-body-md text-body-md" id="guest-name" placeholder="e.g. Jonathan Doe" type="text" required value={guestName} onChange={(e) => setGuestName(e.target.value)} />
                   </div>
                   <div className="space-y-xs">
                     <label className="block font-label-bold text-label-bold text-on-surface-variant" htmlFor="loyalty-id">LOYALTY ID (OPTIONAL)</label>
@@ -129,11 +156,11 @@ const NewBooking = () => {
                   </div>
                   <div className="space-y-xs">
                     <label className="block font-label-bold text-label-bold text-on-surface-variant" htmlFor="guest-email">EMAIL ADDRESS</label>
-                    <input className="w-full border-outline-variant rounded-lg focus:ring-primary focus:border-primary font-body-md text-body-md" id="guest-email" placeholder="j.doe@example.com" type="email" />
+                    <input className="w-full border-outline-variant rounded-lg focus:ring-primary focus:border-primary font-body-md text-body-md" id="guest-email" placeholder="j.doe@example.com" type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} />
                   </div>
                   <div className="space-y-xs">
                     <label className="block font-label-bold text-label-bold text-on-surface-variant" htmlFor="guest-phone">PHONE NUMBER</label>
-                    <input className="w-full border-outline-variant rounded-lg focus:ring-primary focus:border-primary font-body-md text-body-md" id="guest-phone" placeholder="+1 (555) 000-0000" type="tel" />
+                    <input className="w-full border-outline-variant rounded-lg focus:ring-primary focus:border-primary font-body-md text-body-md" id="guest-phone" placeholder="+1 (555) 000-0000" type="tel" value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} />
                   </div>
                 </div>
               </section>
@@ -146,19 +173,19 @@ const NewBooking = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-md mb-8">
                   <div className="space-y-xs">
                     <label className="block font-label-bold text-label-bold text-on-surface-variant" htmlFor="check-in">CHECK-IN DATE</label>
-                    <input className="w-full border-outline-variant rounded-lg focus:ring-primary focus:border-primary font-body-md text-body-md" id="check-in" type="date" />
+                    <input className="w-full border-outline-variant rounded-lg focus:ring-primary focus:border-primary font-body-md text-body-md" id="check-in" type="date" required value={checkIn} onChange={(e) => setCheckIn(e.target.value)} />
                   </div>
                   <div className="space-y-xs">
                     <label className="block font-label-bold text-label-bold text-on-surface-variant" htmlFor="check-out">CHECK-OUT DATE</label>
-                    <input className="w-full border-outline-variant rounded-lg focus:ring-primary focus:border-primary font-body-md text-body-md" id="check-out" type="date" />
+                    <input className="w-full border-outline-variant rounded-lg focus:ring-primary focus:border-primary font-body-md text-body-md" id="check-out" type="date" required value={checkOut} onChange={(e) => setCheckOut(e.target.value)} />
                   </div>
                   <div className="space-y-xs">
                     <label className="block font-label-bold text-label-bold text-on-surface-variant" htmlFor="adults">ADULTS</label>
-                    <select className="w-full border-outline-variant rounded-lg focus:ring-primary focus:border-primary font-body-md text-body-md" defaultValue="2 Adults" id="adults">
-                      <option>1 Adult</option>
-                      <option>2 Adults</option>
-                      <option>3 Adults</option>
-                      <option>4 Adults</option>
+                    <select className="w-full border-outline-variant rounded-lg focus:ring-primary focus:border-primary font-body-md text-body-md" id="adults" value={adults} onChange={(e) => setAdults(Number(e.target.value))}>
+                      <option value={1}>1 Adult</option>
+                      <option value={2}>2 Adults</option>
+                      <option value={3}>3 Adults</option>
+                      <option value={4}>4 Adults</option>
                     </select>
                   </div>
                   <div className="space-y-xs">
@@ -171,18 +198,21 @@ const NewBooking = () => {
                   </div>
                 </div>
                 <div className="space-y-md">
-                  <label className="block font-label-bold text-label-bold text-on-surface-variant">SELECT AVAILABLE ROOM TYPE</label>
+                  <label className="block font-label-bold text-label-bold text-on-surface-variant">SELECT ROOM TYPE</label>
+                  {roomTypes.length === 0 && (
+                    <p className="text-body-sm text-secondary">No room types configured yet. Add one under Room Management.</p>
+                  )}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-md">
-                    {roomOptions.map((room) => (
-                      <label className="relative group cursor-pointer" key={room.name}>
-                        <input className="peer absolute opacity-0" defaultChecked={room.checked} name="room_type" type="radio" />
+                    {roomTypes.map((room) => (
+                      <label className="relative group cursor-pointer" key={room.id}>
+                        <input className="peer absolute opacity-0" checked={roomTypeId === room.id} onChange={() => setRoomTypeId(room.id)} name="room_type" type="radio" />
                         <div className="p-md rounded-xl border border-outline-variant peer-checked:border-primary peer-checked:bg-blue-50/30 transition-all hover:bg-slate-50 h-full flex flex-col">
-                          <div className="mb-3 overflow-hidden rounded-lg">
-                            <img alt={room.alt} className="w-full h-32 object-cover transition-transform group-hover:scale-105" src={room.image} />
+                          <div className="mb-3 overflow-hidden rounded-lg bg-slate-100 h-32 flex items-center justify-center">
+                            <span className="material-symbols-outlined text-slate-300 text-5xl">bed</span>
                           </div>
                           <p className="font-bold text-primary text-sm">{room.name}</p>
-                          <p className="text-xs text-secondary mt-1">{room.meta}</p>
-                          <p className="mt-auto pt-3 font-bold text-primary text-md">{room.price}<span className="text-xs font-normal text-secondary">/night</span></p>
+                          <p className="text-xs text-secondary mt-1">Sleeps {room.capacity}</p>
+                          <p className="mt-auto pt-3 font-bold text-primary text-md">${room.base_price}<span className="text-xs font-normal text-secondary">/night</span></p>
                         </div>
                         <div className="absolute top-2 right-2 hidden peer-checked:block text-primary">
                           <span className="material-symbols-outlined text-lg" data-icon="check_circle" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
@@ -200,7 +230,7 @@ const NewBooking = () => {
                 </div>
                 <div className="space-y-xs">
                   <label className="block font-label-bold text-label-bold text-on-surface-variant" htmlFor="guest-notes">GUEST NOTES &amp; INSTRUCTIONS</label>
-                  <textarea className="w-full border-outline-variant rounded-lg focus:ring-primary focus:border-primary font-body-md text-body-md" id="guest-notes" placeholder="Mention allergies, late check-in, preferred floor, or airport shuttle requirements..." rows={4}></textarea>
+                  <textarea className="w-full border-outline-variant rounded-lg focus:ring-primary focus:border-primary font-body-md text-body-md" id="guest-notes" placeholder="Mention allergies, late check-in, preferred floor, or airport shuttle requirements..." rows={4} value={notes} onChange={(e) => setNotes(e.target.value)}></textarea>
                 </div>
               </section>
             </div>
@@ -214,23 +244,28 @@ const NewBooking = () => {
                 <div className="p-lg space-y-md">
                   <div className="space-y-sm">
                     <div className="flex justify-between text-body-md font-medium text-secondary">
-                      <span>Deluxe King (3 nights)</span>
-                      <span className="text-primary">$747.00</span>
+                      <span>{selectedType?.name ?? 'Room'} ({nights} night{nights === 1 ? '' : 's'})</span>
+                      <span className="text-primary">${roomTotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-body-md font-medium text-secondary">
                       <span>Service Fee (Fixed)</span>
-                      <span className="text-primary">$45.00</span>
+                      <span className="text-primary">${serviceFee.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-body-md font-medium text-secondary">
                       <span>Tourism Tax (12%)</span>
-                      <span className="text-primary">$89.64</span>
+                      <span className="text-primary">${tax.toFixed(2)}</span>
                     </div>
                   </div>
                   <hr className="border-slate-100" />
                   <div className="flex justify-between items-center py-2">
                     <span className="font-bold text-primary text-lg">Estimated Total</span>
-                    <span className="font-extrabold text-primary text-2xl">$881.64</span>
+                    <span className="font-extrabold text-primary text-2xl">${total.toFixed(2)}</span>
                   </div>
+                  {error && (
+                    <p className="text-error font-body-sm text-body-sm flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[18px]">error</span>{error}
+                    </p>
+                  )}
                   <div className="bg-surface-container-low p-md rounded-lg border border-blue-100/50">
                     <div className="flex gap-3">
                       <span className="material-symbols-outlined text-blue-700" data-icon="info">info</span>
@@ -240,8 +275,8 @@ const NewBooking = () => {
                     </div>
                   </div>
                   <div className="pt-lg space-y-md">
-                    <button className="w-full py-3 bg-primary text-white rounded-lg font-bold hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2" type="submit">
-                      Confirm Booking
+                    <button className="w-full py-3 bg-primary text-white rounded-lg font-bold hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-60" type="submit" disabled={submitting}>
+                      {submitting ? 'Creating…' : 'Confirm Booking'}
                       <span className="material-symbols-outlined" data-icon="arrow_forward">arrow_forward</span>
                     </button>
                     <a className="w-full py-3 bg-white text-secondary border border-outline-variant rounded-lg font-bold hover:bg-slate-50 active:scale-[0.98] transition-all flex items-center justify-center" href="/dashboard">

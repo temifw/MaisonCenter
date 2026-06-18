@@ -8,6 +8,7 @@ import NewRoom from './pages/NewRoom'
 import RoomDetail from './pages/RoomDetail'
 import RoomManagement from './pages/RoomManagement'
 import SignIn from './pages/SignIn'
+import { RequireAuth } from './components/RequireAuth'
 
 function App() {
   const path = window.location.pathname
@@ -16,37 +17,17 @@ function App() {
     return <SignIn />
   }
 
-  if (path === '/dashboard') {
-    return <Dashboard />
-  }
+  // Everything below requires an authenticated staff user.
+  const protect = (page: React.ReactNode) => <RequireAuth>{page}</RequireAuth>
 
-  if (path === '/rooms') {
-    return <RoomManagement />
-  }
-
-  if (path === '/calendar') {
-    return <BookingCalendar />
-  }
-
-  if (path === '/guests') {
-    return <GuestDirectory />
-  }
-
-  if (path === '/booking-confirmation') {
-    return <BookingConfirmation />
-  }
-
-  if (path === '/new-booking') {
-    return <NewBooking />
-  }
-
-  if (path === '/new-room') {
-    return <NewRoom />
-  }
-
-  if (path === '/room-detail') {
-    return <RoomDetail />
-  }
+  if (path === '/dashboard') return protect(<Dashboard />)
+  if (path === '/rooms') return protect(<RoomManagement />)
+  if (path === '/calendar') return protect(<BookingCalendar />)
+  if (path === '/guests') return protect(<GuestDirectory />)
+  if (path === '/booking-confirmation') return protect(<BookingConfirmation />)
+  if (path === '/new-booking') return protect(<NewBooking />)
+  if (path === '/new-room') return protect(<NewRoom />)
+  if (path === '/room-detail') return protect(<RoomDetail />)
 
   return (
     <div className="min-h-screen bg-surface text-on-surface flex items-center justify-center p-8">

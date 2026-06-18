@@ -3,6 +3,9 @@ import Home from './pages/Home';
 import Rooms from './pages/Rooms';
 import RoomDetails from './pages/RoomDetails';
 import About from './pages/About';
+import Book from './pages/Book';
+import SignIn from './pages/SignIn';
+import SignUp from './pages/SignUp';
 
 function App() {
   const [path, setPath] = useState(window.location.pathname);
@@ -13,18 +16,13 @@ function App() {
     return () => window.removeEventListener('popstate', onLocationChange);
   }, []);
 
-  if (path === '/details') {
-    return <RoomDetails />;
-  }
+  if (path === '/details') return <RoomDetails />;
+  if (path === '/about') return <About />;
+  if (path === '/rooms') return <Rooms />;
+  if (path === '/book') return <Book />;
+  if (path === '/sign-in') return <SignIn />;
+  if (path === '/sign-up') return <SignUp />;
 
-  if (path === '/about') {
-    return <About />;
-  }
-
-  if (path === '/rooms') {
-    return <Rooms />;
-  }
-  
   return <Home />;
 }
 

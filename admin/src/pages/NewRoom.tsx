@@ -1,4 +1,5 @@
-import type { FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { hotelService, type RoomType } from '../services/hotelService'
 
 const amenities = [
   'King Bed',
@@ -12,9 +13,38 @@ const amenities = [
 ]
 
 const NewRoom = () => {
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const [roomTypes, setRoomTypes] = useState<RoomType[]>([])
+  const [roomNumber, setRoomNumber] = useState('')
+  const [roomTypeId, setRoomTypeId] = useState('')
+  const [floor, setFloor] = useState('1')
+  const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    hotelService.getRoomTypes().then((res) => {
+      setRoomTypes(res.data)
+      if (res.data[0]) setRoomTypeId(res.data[0].id)
+    }).catch(() => setRoomTypes([]))
+  }, [])
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    window.location.href = '/rooms'
+    setError(null)
+    setSaving(true)
+    try {
+      await hotelService.addRoom({
+        roomNumber,
+        roomTypeId,
+        floor: Number(floor),
+        notes: notes || undefined,
+      })
+      window.location.href = '/rooms'
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Could not save the room.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -112,7 +142,7 @@ const NewRoom = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-md">
               <div className="space-y-xs">
                 <label className="block font-label-bold text-label-bold text-on-surface-variant" htmlFor="room-number">ROOM NUMBER</label>
-                <input className="w-full border-outline-variant rounded-lg focus:ring-primary focus:border-primary font-body-md text-body-md" id="room-number" placeholder="e.g. 405" required type="text" />
+                <input className="w-full border-outline-variant rounded-lg focus:ring-primary focus:border-primary font-body-md text-body-md" id="room-number" placeholder="e.g. 405" required type="text" value={roomNumber} onChange={(e) => setRoomNumber(e.target.value)} />
               </div>
               <div className="space-y-xs">
                 <label className="block font-label-bold text-label-bold text-on-surface-variant" htmlFor="room-name">ROOM NAME</label>
@@ -120,12 +150,11 @@ const NewRoom = () => {
               </div>
               <div className="space-y-xs">
                 <label className="block font-label-bold text-label-bold text-on-surface-variant" htmlFor="room-type">ROOM TYPE</label>
-                <select className="w-full border-outline-variant rounded-lg focus:ring-primary focus:border-primary font-body-md text-body-md" id="room-type" required>
-                  <option>Deluxe King</option>
-                  <option>Deluxe Twin</option>
-                  <option>Executive Suite</option>
-                  <option>Penthouse Suite</option>
-                  <option>Standard Single</option>
+                <select className="w-full border-outline-variant rounded-lg focus:ring-primary focus:border-primary font-body-md text-body-md" id="room-type" required value={roomTypeId} onChange={(e) => setRoomTypeId(e.target.value)}>
+                  {roomTypes.length === 0 && <option value="">No room types yet</option>}
+                  {roomTypes.map((rt) => (
+                    <option key={rt.id} value={rt.id}>{rt.name} — ${rt.base_price}/night</option>
+                  ))}
                 </select>
               </div>
               <div className="space-y-xs">
@@ -139,11 +168,11 @@ const NewRoom = () => {
               </div>
               <div className="space-y-xs">
                 <label className="block font-label-bold text-label-bold text-on-surface-variant" htmlFor="floor">FLOOR</label>
-                <select className="w-full border-outline-variant rounded-lg focus:ring-primary focus:border-primary font-body-md text-body-md" id="floor">
-                  <option>Floor 1</option>
-                  <option>Floor 2</option>
-                  <option>Floor 3</option>
-                  <option>Floor 4</option>
+                <select className="w-full border-outline-variant rounded-lg focus:ring-primary focus:border-primary font-body-md text-body-md" id="floor" value={floor} onChange={(e) => setFloor(e.target.value)}>
+                  <option value="1">Floor 1</option>
+                  <option value="2">Floor 2</option>
+                  <option value="3">Floor 3</option>
+                  <option value="4">Floor 4</option>
                 </select>
               </div>
               <div className="space-y-xs">
@@ -197,14 +226,19 @@ const NewRoom = () => {
 
           <section className="col-span-12 bg-surface-container-lowest p-lg rounded-xl shadow-[rgba(16,42,67,0.08)_0px_4px_12px] border border-white/50">
             <label className="block font-label-bold text-label-bold text-on-surface-variant mb-xs" htmlFor="notes">INTERNAL NOTES</label>
-            <textarea className="w-full border-outline-variant rounded-lg focus:ring-primary focus:border-primary font-body-md text-body-md" id="notes" placeholder="Housekeeping notes, maintenance restrictions, or sales context..." rows={4}></textarea>
+            <textarea className="w-full border-outline-variant rounded-lg focus:ring-primary focus:border-primary font-body-md text-body-md" id="notes" placeholder="Housekeeping notes, maintenance restrictions, or sales context..." rows={4} value={notes} onChange={(e) => setNotes(e.target.value)}></textarea>
+            {error && (
+              <p className="mt-md text-error font-body-sm text-body-sm flex items-center gap-2">
+                <span className="material-symbols-outlined text-[18px]">error</span>{error}
+              </p>
+            )}
             <div className="flex justify-end gap-md mt-lg">
               <a className="px-lg py-sm rounded-lg border border-outline-variant text-secondary font-label-bold hover:bg-surface-container transition-colors" href="/rooms">
                 Cancel
               </a>
-              <button className="px-lg py-sm rounded-lg bg-primary-container text-white font-label-bold hover:opacity-90 transition-opacity shadow-sm flex items-center gap-2" type="submit">
+              <button className="px-lg py-sm rounded-lg bg-primary-container text-white font-label-bold hover:opacity-90 transition-opacity shadow-sm flex items-center gap-2 disabled:opacity-60" type="submit" disabled={saving || !roomTypeId}>
                 <span className="material-symbols-outlined text-[20px]">save</span>
-                Save Room
+                {saving ? 'Saving…' : 'Save Room'}
               </button>
             </div>
           </section>

@@ -1,21 +1,49 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 const SignIn = () => {
+    const { login } = useAuth();
+
+    // Reaching the sign-in screen ends any existing session, so the
+    // "Sign Out" links throughout the app (which point here) just work.
+    useEffect(() => {
+        localStorage.removeItem('authToken');
+    }, []);
     const [showPassword, setShowPassword] = useState(false);
     const [isAuthenticating, setIsAuthenticating] = useState(false);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState<string | null>(null);
 
     const togglePassword = () => {
         setShowPassword(!showPassword);
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError(null);
         setIsAuthenticating(true);
-        
-        setTimeout(() => {
-            setIsAuthenticating(false);
+        try {
+            const user = await login(email, password);
+            if (!user.isStaff) {
+                setError('This account is not authorized for staff access.');
+                localStorage.removeItem('authToken');
+                return;
+            }
             window.location.href = '/dashboard';
-        }, 1500);
+        } catch (err: any) {
+            if (err?.response?.data?.error) {
+                // Server responded with a real error (e.g. wrong password).
+                setError(err.response.data.error);
+            } else if (err?.response) {
+                setError(`Server error (${err.response.status}). Check the API logs.`);
+            } else {
+                // No response at all => the API server wasn't reachable.
+                setError('Cannot reach the API at http://localhost:3000. Is the backend running (npm run dev) and is the .env loaded?');
+            }
+        } finally {
+            setIsAuthenticating(false);
+        }
     };
 
     return (
@@ -43,13 +71,19 @@ const SignIn = () => {
                         <h2 className="font-h3 text-h3 text-primary mb-xs">Sign In</h2>
                         <p className="font-body-sm text-body-sm text-secondary">Please enter your credentials to access the dashboard.</p>
                     </header>
+                    {error && (
+                        <div className="bg-error-container text-error rounded-lg px-md py-sm font-body-sm text-body-sm flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[18px]">error</span>
+                            {error}
+                        </div>
+                    )}
                     <form className="flex flex-col gap-md" onSubmit={handleSubmit}>
                         {/* Email Field */}
                         <div className="flex flex-col gap-xs">
                             <label className="font-label-bold text-label-bold text-on-surface-variant" htmlFor="email">Email Address</label>
                             <div className="relative group">
                                 <span className="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-outline text-[20px] group-focus-within:text-primary transition-colors">mail</span>
-                                <input className="w-full pl-[48px] pr-md py-md bg-surface border border-outline-variant rounded-lg font-body-md text-body-md focus:ring-2 focus:ring-primary-container focus:border-primary outline-none transition-all" id="email" name="email" placeholder="admin@luxstay.com" required type="email"/>
+                                <input className="w-full pl-[48px] pr-md py-md bg-surface border border-outline-variant rounded-lg font-body-md text-body-md focus:ring-2 focus:ring-primary-container focus:border-primary outline-none transition-all" id="email" name="email" placeholder="admin@luxstay.com" required type="email" value={email} onChange={(e) => setEmail(e.target.value)}/>
                             </div>
                         </div>
                         
@@ -61,7 +95,7 @@ const SignIn = () => {
                             </div>
                             <div className="relative group">
                                 <span className="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-outline text-[20px] group-focus-within:text-primary transition-colors">lock</span>
-                                <input className="w-full pl-[48px] pr-md py-md bg-surface border border-outline-variant rounded-lg font-body-md text-body-md focus:ring-2 focus:ring-primary-container focus:border-primary outline-none transition-all" id="password" name="password" placeholder="••••••••" required type={showPassword ? "text" : "password"}/>
+                                <input className="w-full pl-[48px] pr-md py-md bg-surface border border-outline-variant rounded-lg font-body-md text-body-md focus:ring-2 focus:ring-primary-container focus:border-primary outline-none transition-all" id="password" name="password" placeholder="••••••••" required type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)}/>
                                 <button className="absolute right-md top-1/2 -translate-y-1/2 text-outline hover:text-on-surface transition-colors" onClick={togglePassword} type="button">
                                     <span className="material-symbols-outlined text-[20px]">{showPassword ? "visibility_off" : "visibility"}</span>
                                 </button>

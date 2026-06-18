@@ -1,6 +1,18 @@
+import { useEffect, useState } from 'react';
 import Layout from '../components/Layout';
+import { hotelService, type RoomType } from '../services/hotelService';
 
 const Rooms = () => {
+  const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    hotelService.getRoomTypes()
+      .then((res) => setRoomTypes(res.data))
+      .catch(() => setRoomTypes([]))
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <Layout>
       <div className="font-body-md text-on-surface">
@@ -10,8 +22,42 @@ const Rooms = () => {
         <h1 className="font-display-lg text-4xl md:text-display-lg text-stone-900 mb-6">Our Accommodations</h1>
         <p className="max-w-2xl mx-auto text-stone-500 font-body-lg">A curated collection of sanctuaries designed for the discerning traveler. Each space is a masterclass in architectural serenity and bespoke comfort.</p>
       </header>
-      {/* Rooms Grid */}
+      {/* Live Rooms From The Database */}
       <main className="px-6 md:px-12 pb-16 md:pb-32 w-full">
+        {loading && <p className="text-center text-stone-500 mb-16">Loading accommodations…</p>}
+        {!loading && roomTypes.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-gutter gap-y-16 mb-24">
+            {roomTypes.map((rt) => (
+              <div className="group flex flex-col" key={rt.id}>
+                <div className="aspect-[4/5] overflow-hidden bg-stone-100 mb-8 border border-stone-200/20 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-7xl text-stone-300">king_bed</span>
+                </div>
+                <div className="flex justify-between items-start mb-4">
+                  <h2 className="font-headline-md text-stone-900">{rt.name}</h2>
+                  <div className="text-right">
+                    <span className="font-label-caps text-stone-400 block mb-1">FROM</span>
+                    <span className="font-headline-md text-stone-900">${rt.base_price}</span>
+                  </div>
+                </div>
+                {rt.description && <p className="text-stone-500 font-body-md mb-4">{rt.description}</p>}
+                <div className="flex gap-3 mb-6 flex-wrap">
+                  <span className="px-3 py-1 border border-stone-200 font-label-caps text-[10px] text-stone-500">SLEEPS {rt.capacity}</span>
+                  {(rt.amenities ?? []).slice(0, 2).map((a) => (
+                    <span key={a} className="px-3 py-1 border border-stone-200 font-label-caps text-[10px] text-stone-500 uppercase">{a}</span>
+                  ))}
+                </div>
+                <a href={`/book?type=${rt.id}`} className="mt-auto block text-center w-full py-4 border border-stone-900 font-label-caps tracking-widest text-stone-900 hover:bg-stone-900 hover:text-white transition-colors duration-300 uppercase">
+                  Reserve
+                </a>
+              </div>
+            ))}
+          </div>
+        )}
+        {!loading && roomTypes.length === 0 && (
+          <p className="text-center text-stone-500 mb-16">Our accommodations are being prepared. Please check back soon.</p>
+        )}
+
+        {/* Editorial showcase (illustrative tiers) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-gutter gap-y-20">
           {/* Room Tier: Deluxe Suite */}
           <div className="group">

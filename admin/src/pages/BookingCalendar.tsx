@@ -1,6 +1,41 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { hotelService, type Booking } from '../services/hotelService';
+
+const STATUS_BAR: Record<string, string> = {
+  confirmed: 'bg-secondary-container/40 border-secondary text-on-secondary-container',
+  pending: 'bg-tertiary-fixed border-tertiary-fixed-dim text-on-tertiary-fixed-variant',
+  checked_in: 'bg-primary-fixed border-on-primary-fixed-variant text-on-primary-fixed-variant',
+};
 
 const BookingCalendar: React.FC = () => {
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Compute Mon–Sun of the current week.
+  const weekDays = useMemo(() => {
+    const now = new Date();
+    const day = (now.getDay() + 6) % 7; // 0 = Monday
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - day);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      return d;
+    });
+  }, []);
+
+  useEffect(() => {
+    const from = weekDays[0].toISOString().slice(0, 10);
+    const to = weekDays[6].toISOString().slice(0, 10);
+    hotelService
+      .getCalendar(from, to)
+      .then((r) => setBookings(r.data))
+      .catch(() => setBookings([]))
+      .finally(() => setLoading(false));
+  }, [weekDays]);
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   return (
     <div className="bg-background text-on-background font-body-md overflow-hidden min-h-screen">
       {/* SideNavBar (Fixed Shell) */}
@@ -91,10 +126,10 @@ const BookingCalendar: React.FC = () => {
               <button className="px-3 py-1.5 text-xs font-bold rounded-md bg-white shadow-sm text-primary">Week</button>
               <button className="px-3 py-1.5 text-xs font-medium text-secondary hover:text-primary">Month</button>
             </div>
-            <button className="flex items-center gap-2 px-4 py-2 bg-primary-container text-white rounded-lg text-body-md font-bold hover:opacity-90 transition-all shadow-md">
+            <a className="flex items-center gap-2 px-4 py-2 bg-primary-container text-white rounded-lg text-body-md font-bold hover:opacity-90 transition-all shadow-md" href="/new-booking">
               <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>add</span>
               New Booking
-            </button>
+            </a>
           </div>
         </div>
 
@@ -107,186 +142,61 @@ const BookingCalendar: React.FC = () => {
               <span className="material-symbols-outlined text-sm text-slate-400">filter_list</span>
             </div>
             <div className="flex-1 overflow-x-auto flex scrollbar-hide">
-              <div className="flex items-center">
-                {/* Dates X-Axis */}
-                <div className="w-32 flex flex-col items-center py-3 border-r border-slate-50">
-                  <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Mon</span>
-                  <span className="text-lg font-extrabold text-slate-800">12</span>
-                  <span className="text-[10px] text-slate-400">Oct</span>
-                </div>
-                <div className="w-32 flex flex-col items-center py-3 border-r border-slate-50 bg-blue-50/50">
-                  <span className="text-[10px] uppercase tracking-widest text-blue-600 font-bold">Tue</span>
-                  <span className="text-lg font-extrabold text-blue-700">13</span>
-                  <span className="text-[10px] text-blue-400">Today</span>
-                </div>
-                <div className="w-32 flex flex-col items-center py-3 border-r border-slate-50">
-                  <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Wed</span>
-                  <span className="text-lg font-extrabold text-slate-800">14</span>
-                  <span className="text-[10px] text-slate-400">Oct</span>
-                </div>
-                <div className="w-32 flex flex-col items-center py-3 border-r border-slate-50">
-                  <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Thu</span>
-                  <span className="text-lg font-extrabold text-slate-800">15</span>
-                  <span className="text-[10px] text-slate-400">Oct</span>
-                </div>
-                <div className="w-32 flex flex-col items-center py-3 border-r border-slate-50">
-                  <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Fri</span>
-                  <span className="text-lg font-extrabold text-slate-800">16</span>
-                  <span className="text-[10px] text-slate-400">Oct</span>
-                </div>
-                <div className="w-32 flex flex-col items-center py-3 border-r border-slate-50">
-                  <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Sat</span>
-                  <span className="text-lg font-extrabold text-slate-800">17</span>
-                  <span className="text-[10px] text-slate-400">Oct</span>
-                </div>
-                <div className="w-32 flex flex-col items-center py-3 border-r border-slate-50">
-                  <span className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Sun</span>
-                  <span className="text-lg font-extrabold text-slate-800">18</span>
-                  <span className="text-[10px] text-slate-400">Oct</span>
-                </div>
+              <div className="flex items-center w-full">
+                {weekDays.map((d) => {
+                  const iso = d.toISOString().slice(0, 10);
+                  const isToday = iso === todayStr;
+                  return (
+                    <div key={iso} className={`flex-1 min-w-[64px] flex flex-col items-center py-3 border-r border-slate-50 ${isToday ? 'bg-blue-50/50' : ''}`}>
+                      <span className={`text-[10px] uppercase tracking-widest font-bold ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>
+                        {d.toLocaleDateString(undefined, { weekday: 'short' })}
+                      </span>
+                      <span className={`text-lg font-extrabold ${isToday ? 'text-blue-700' : 'text-slate-800'}`}>{d.getDate()}</span>
+                      <span className={`text-[10px] ${isToday ? 'text-blue-400' : 'text-slate-400'}`}>
+                        {isToday ? 'Today' : d.toLocaleDateString(undefined, { month: 'short' })}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
 
-          {/* Scrollable Grid Body */}
+          {/* Scrollable Grid Body — one row per booking this week */}
           <div className="flex-1 overflow-y-auto scrollbar-hide">
-            {/* Room Row 1 */}
-            <div className="flex min-h-[80px] border-b border-slate-50 group hover:bg-slate-50/50 transition-colors">
-              <div className="w-64 p-4 border-r border-slate-100 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center">
-                  <span className="material-symbols-outlined text-secondary">king_bed</span>
-                </div>
-                <div>
-                  <p className="text-body-md font-bold text-primary leading-tight">Room 101</p>
-                  <p className="text-body-sm text-secondary">Deluxe King Suite</p>
-                </div>
-              </div>
-              <div className="flex-1 flex relative">
-                {/* Booking Block */}
-                <div className="absolute left-0 top-3 h-[54px] w-64 bg-secondary-container/40 border-l-4 border-secondary text-on-secondary-container p-2 rounded-r-lg shadow-sm z-10 flex flex-col justify-center cursor-pointer hover:brightness-95">
-                  <p className="text-[11px] font-bold truncate">Marcos Alvarez</p>
-                  <p className="text-[9px] opacity-70">2 Adults • Confirmed</p>
-                </div>
-                {/* Day Columns */}
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50 bg-blue-50/10"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-              </div>
-            </div>
-
-            {/* Room Row 2 */}
-            <div className="flex min-h-[80px] border-b border-slate-50 group hover:bg-slate-50/50 transition-colors">
-              <div className="w-64 p-4 border-r border-slate-100 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center">
-                  <span className="material-symbols-outlined text-secondary">single_bed</span>
-                </div>
-                <div>
-                  <p className="text-body-md font-bold text-primary leading-tight">Room 102</p>
-                  <p className="text-body-sm text-secondary">Classic Twin</p>
-                </div>
-              </div>
-              <div className="flex-1 flex relative">
-                {/* Booking Block */}
-                <div className="absolute left-96 top-3 h-[54px] w-96 bg-tertiary-fixed border-l-4 border-tertiary-fixed-dim text-on-tertiary-fixed-variant p-2 rounded-r-lg shadow-sm z-10 flex flex-col justify-center cursor-pointer hover:brightness-95">
-                  <p className="text-[11px] font-bold truncate">Sarah J. Parker</p>
-                  <p className="text-[9px] opacity-70">1 Adult • Pending</p>
-                </div>
-                {/* Day Columns */}
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50 bg-blue-50/10"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-              </div>
-            </div>
-
-            {/* Room Row 3 */}
-            <div className="flex min-h-[80px] border-b border-slate-50 group hover:bg-slate-50/50 transition-colors">
-              <div className="w-64 p-4 border-r border-slate-100 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center">
-                  <span className="material-symbols-outlined text-secondary">apartment</span>
-                </div>
-                <div>
-                  <p className="text-body-md font-bold text-primary leading-tight">Suite 201</p>
-                  <p className="text-body-sm text-secondary">Presidential Penthouse</p>
-                </div>
-              </div>
-              <div className="flex-1 flex relative">
-                {/* Booking Block */}
-                <div className="absolute left-32 top-3 h-[54px] w-[512px] bg-primary-fixed border-l-4 border-on-primary-fixed-variant text-on-primary-fixed-variant p-2 rounded-r-lg shadow-sm z-10 flex flex-col justify-center cursor-pointer hover:brightness-95">
-                  <div className="flex items-center justify-between">
-                    <p className="text-[11px] font-bold truncate">Global Tech Solutions Corp.</p>
-                    <span className="material-symbols-outlined text-sm">lock</span>
+            {loading && (
+              <div className="p-6 text-center text-secondary">Loading this week’s bookings…</div>
+            )}
+            {!loading && bookings.length === 0 && (
+              <div className="p-6 text-center text-secondary">No bookings scheduled this week.</div>
+            )}
+            {!loading && bookings.map((b) => {
+              const bar = STATUS_BAR[b.status] || 'bg-surface-container border-outline-variant text-on-surface';
+              return (
+                <div className="flex min-h-[80px] border-b border-slate-50 group hover:bg-slate-50/50 transition-colors" key={b.id}>
+                  <div className="w-64 p-4 border-r border-slate-100 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center">
+                      <span className="material-symbols-outlined text-secondary">king_bed</span>
+                    </div>
+                    <div>
+                      <p className="text-body-md font-bold text-primary leading-tight">Room {b.rooms?.room_number ?? '—'}</p>
+                      <p className="text-body-sm text-secondary">{b.rooms?.room_types?.name ?? 'Room'}</p>
+                    </div>
                   </div>
-                  <p className="text-[9px] opacity-70">Block Booking • 4 Rooms Reserved</p>
+                  <div className="flex-1 flex items-center p-3">
+                    <div className={`w-full ${bar} border-l-4 p-2 rounded-r-lg shadow-sm flex items-center justify-between`}>
+                      <div>
+                        <p className="text-[12px] font-bold truncate">{b.guests?.full_name ?? 'Guest'}</p>
+                        <p className="text-[10px] opacity-70 capitalize">
+                          {new Date(b.check_in).toLocaleDateString()} → {new Date(b.check_out).toLocaleDateString()} • {b.status}
+                        </p>
+                      </div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">{b.source}</span>
+                    </div>
+                  </div>
                 </div>
-                {/* Day Columns */}
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50 bg-blue-50/10"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-              </div>
-            </div>
-
-            {/* Room Row 4 */}
-            <div className="flex min-h-[80px] border-b border-slate-50 group hover:bg-slate-50/50 transition-colors">
-              <div className="w-64 p-4 border-r border-slate-100 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center">
-                  <span className="material-symbols-outlined text-secondary">bed</span>
-                </div>
-                <div>
-                  <p className="text-body-md font-bold text-primary leading-tight">Room 202</p>
-                  <p className="text-body-sm text-secondary">Queen Ocean View</p>
-                </div>
-              </div>
-              <div className="flex-1 flex relative">
-                {/* Day Columns */}
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50 bg-blue-50/10"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-              </div>
-            </div>
-
-            {/* Room Row 5 */}
-            <div className="flex min-h-[80px] border-b border-slate-50 group hover:bg-slate-50/50 transition-colors">
-              <div className="w-64 p-4 border-r border-slate-100 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center">
-                  <span className="material-symbols-outlined text-secondary">bed</span>
-                </div>
-                <div>
-                  <p className="text-body-md font-bold text-primary leading-tight">Room 203</p>
-                  <p className="text-body-sm text-secondary">Queen Garden View</p>
-                </div>
-              </div>
-              <div className="flex-1 flex relative">
-                {/* Booking Block */}
-                <div className="absolute left-0 top-3 h-[54px] w-32 bg-error-container border-l-4 border-error text-on-error-container p-2 rounded-r-lg shadow-sm z-10 flex flex-col justify-center cursor-pointer hover:brightness-95">
-                  <p className="text-[11px] font-bold truncate">Maintenance</p>
-                  <p className="text-[9px] opacity-70">HVAC Repair</p>
-                </div>
-                {/* Day Columns */}
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50 bg-blue-50/10"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-                <div className="w-32 h-full border-r border-slate-50"></div>
-              </div>
-            </div>
+              );
+            })}
           </div>
           
           {/* Calendar Footer Summary */}
@@ -310,9 +220,8 @@ const BookingCalendar: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center gap-4 text-body-sm font-bold text-primary">
-              <span>Occupancy: 78%</span>
-              <span>Arrivals: 12</span>
-              <span>Departures: 8</span>
+              <span>Bookings this week: {bookings.length}</span>
+              <span>Arrivals: {bookings.filter((b) => b.check_in >= weekDays[0].toISOString().slice(0, 10)).length}</span>
             </div>
           </div>
         </div>

@@ -1,6 +1,47 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { hotelService, type Room } from '../services/hotelService';
+
+const STATUS_STYLES: Record<Room['status'], { label: string; badge: string; dot: string }> = {
+  available:   { label: 'Available',   badge: 'bg-green-600',  dot: 'bg-green-600' },
+  occupied:    { label: 'Occupied',    badge: 'bg-orange-500', dot: 'bg-orange-600' },
+  cleaning:    { label: 'Cleaning',    badge: 'bg-red-600',    dot: 'bg-red-600' },
+  maintenance: { label: 'Maintenance', badge: 'bg-slate-700',  dot: 'bg-slate-600' },
+};
+const STATUS_ORDER: Room['status'][] = ['available', 'occupied', 'cleaning', 'maintenance'];
 
 const RoomManagement: React.FC = () => {
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<'all' | Room['status']>('all');
+
+  const loadRooms = () => {
+    setLoading(true);
+    hotelService
+      .getRooms()
+      .then((res) => setRooms(res.data.filter((r) => r.is_active !== false)))
+      .catch(() => setRooms([]))
+      .finally(() => setLoading(false));
+  };
+  useEffect(loadRooms, []);
+
+  const counts = useMemo(() => {
+    const c = { available: 0, occupied: 0, cleaning: 0, maintenance: 0 };
+    rooms.forEach((r) => { if (c[r.status] !== undefined) c[r.status] += 1; });
+    return c;
+  }, [rooms]);
+
+  const occupancy = rooms.length ? Math.round((counts.occupied / rooms.length) * 100) : 0;
+  const visibleRooms = filter === 'all' ? rooms : rooms.filter((r) => r.status === filter);
+
+  const changeStatus = async (room: Room, status: Room['status']) => {
+    setRooms((prev) => prev.map((r) => (r.id === room.id ? { ...r, status } : r))); // optimistic
+    try {
+      await hotelService.setRoomStatus(room.id, status);
+    } catch {
+      loadRooms(); // revert from server on failure
+    }
+  };
+
   return (
     <div className="bg-surface text-on-surface min-h-screen">
       {/* SideNavBar */}
@@ -97,20 +138,20 @@ const RoomManagement: React.FC = () => {
               <div className="flex-1">
                 <label className="block font-label-bold text-on-surface-variant mb-2">FILTER BY STATUS</label>
                 <div className="flex flex-wrap gap-sm">
-                  <button className="px-md py-xs rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-data-tabular text-sm flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-blue-700"></div> All Rooms (48)
+                  <button onClick={() => setFilter('all')} className={`px-md py-xs rounded-full border font-data-tabular text-sm flex items-center gap-2 transition-colors ${filter === 'all' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-surface text-secondary border-outline-variant hover:bg-surface-container'}`}>
+                    <div className="w-2 h-2 rounded-full bg-blue-700"></div> All Rooms ({rooms.length})
                   </button>
-                  <button className="px-md py-xs rounded-full bg-green-50 text-green-700 border border-green-100 font-data-tabular text-sm flex items-center gap-2 hover:bg-green-100 transition-colors">
-                    <div className="w-2 h-2 rounded-full bg-green-600"></div> Available (12)
+                  <button onClick={() => setFilter('available')} className={`px-md py-xs rounded-full border font-data-tabular text-sm flex items-center gap-2 transition-colors ${filter === 'available' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-green-50 text-green-700 border-green-100 hover:bg-green-100'}`}>
+                    <div className="w-2 h-2 rounded-full bg-green-600"></div> Available ({counts.available})
                   </button>
-                  <button className="px-md py-xs rounded-full bg-orange-50 text-orange-700 border border-orange-100 font-data-tabular text-sm flex items-center gap-2 hover:bg-orange-100 transition-colors">
-                    <div className="w-2 h-2 rounded-full bg-orange-600"></div> Occupied (28)
+                  <button onClick={() => setFilter('occupied')} className={`px-md py-xs rounded-full border font-data-tabular text-sm flex items-center gap-2 transition-colors ${filter === 'occupied' ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-orange-50 text-orange-700 border-orange-100 hover:bg-orange-100'}`}>
+                    <div className="w-2 h-2 rounded-full bg-orange-600"></div> Occupied ({counts.occupied})
                   </button>
-                  <button className="px-md py-xs rounded-full bg-red-50 text-red-700 border border-red-100 font-data-tabular text-sm flex items-center gap-2 hover:bg-red-100 transition-colors">
-                    <div className="w-2 h-2 rounded-full bg-red-600"></div> Dirty (5)
+                  <button onClick={() => setFilter('cleaning')} className={`px-md py-xs rounded-full border font-data-tabular text-sm flex items-center gap-2 transition-colors ${filter === 'cleaning' ? 'bg-red-100 text-red-700 border-red-200' : 'bg-red-50 text-red-700 border-red-100 hover:bg-red-100'}`}>
+                    <div className="w-2 h-2 rounded-full bg-red-600"></div> Cleaning ({counts.cleaning})
                   </button>
-                  <button className="px-md py-xs rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-data-tabular text-sm flex items-center gap-2 hover:bg-slate-200 transition-colors">
-                    <div className="w-2 h-2 rounded-full bg-slate-600"></div> Maintenance (3)
+                  <button onClick={() => setFilter('maintenance')} className={`px-md py-xs rounded-full border font-data-tabular text-sm flex items-center gap-2 transition-colors ${filter === 'maintenance' ? 'bg-slate-200 text-slate-700 border-slate-300' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'}`}>
+                    <div className="w-2 h-2 rounded-full bg-slate-600"></div> Maintenance ({counts.maintenance})
                   </button>
                 </div>
               </div>
@@ -131,169 +172,57 @@ const RoomManagement: React.FC = () => {
             <div className="col-span-12 lg:col-span-4 bg-primary-container text-white p-lg rounded-xl shadow-[rgba(16,42,67,0.08)_0px_4px_12px] flex items-center justify-between">
               <div>
                 <p className="text-on-primary-container font-label-bold">CURRENT OCCUPANCY</p>
-                <h3 className="text-[32px] font-bold mt-1">78.5%</h3>
+                <h3 className="text-[32px] font-bold mt-1">{occupancy}%</h3>
               </div>
               <div className="w-16 h-16 rounded-full border-4 border-on-primary-container border-t-white flex items-center justify-center">
-                <span className="text-xs font-bold">28/48</span>
+                <span className="text-xs font-bold">{counts.occupied}/{rooms.length}</span>
               </div>
             </div>
           </div>
 
           {/* Room Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-gutter">
-            {/* Room Card 1 (Suite - Occupied) */}
-            <div className="bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md transition-shadow group overflow-hidden flex flex-col border border-slate-100">
-              <div className="relative h-40 overflow-hidden">
-                <img className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" data-alt="A luxurious hotel suite with a king-sized bed featuring high-thread-count white linens. The room has floor-to-ceiling windows showing a modern city skyline at dusk. The interior is decorated with contemporary walnut furniture and soft ambient lighting, creating a calm, high-end atmosphere consistent with a luxury hospitality brand." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBTrciJ1OY2chBssQiCMODIcmBpAD9gRwTwvVPNRjd9zA-TzsSPU5Hq3FwQK_oeaMUY0woeMxshlkeRJW6GdCLtDh4IFnL4bG7HI1AFzNC4cLkwu9Vl-gyeSEhevA0ezpbU1PdnTR-Kl_tcDpVdTCa_mUzuJDJ9styVLh9We-fknq_RSXNGjU-zwuuSemPsPXiQTqGmrCXdb458ogPMjM395F7cACPcx55kCDUSp47TipIybTxNckuFZbELj-sjC6UJlpWJy4h9Owc" />
-                <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-sm py-1 rounded shadow-sm">
-                  <span className="text-xs font-bold text-primary tracking-widest uppercase">Floor 4</span>
-                </div>
-                <div className="absolute top-3 right-3 bg-orange-500 text-white px-md py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                  <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>person</span>
-                  Occupied
-                </div>
-              </div>
-              <div className="p-lg flex flex-col flex-1">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-h3 font-h3 text-on-surface">Suite 401</h3>
-                  <button className="text-slate-400 hover:text-primary transition-colors">
-                    <span className="material-symbols-outlined">more_vert</span>
-                  </button>
-                </div>
-                <p className="text-body-sm text-secondary mb-md">Executive King Suite • Ocean View</p>
-                <div className="mt-auto pt-md border-t border-slate-100 flex justify-between items-center">
-                  <div className="flex items-center gap-1 text-on-surface-variant">
-                    <span className="material-symbols-outlined text-[18px]">group</span>
-                    <span className="text-data-tabular">2 Guests</span>
+            {loading && (
+              <div className="col-span-full text-center text-secondary py-xl">Loading rooms…</div>
+            )}
+            {!loading && visibleRooms.length === 0 && (
+              <div className="col-span-full text-center text-secondary py-xl">No rooms match this filter.</div>
+            )}
+            {!loading && visibleRooms.map((room) => {
+              const s = STATUS_STYLES[room.status];
+              return (
+                <div className="bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col border border-slate-100" key={room.id}>
+                  <div className="relative h-40 overflow-hidden bg-slate-100 flex items-center justify-center">
+                    <span className="material-symbols-outlined text-slate-300 text-6xl">bed</span>
+                    <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-sm py-1 rounded shadow-sm">
+                      <span className="text-xs font-bold text-primary tracking-widest uppercase">Floor {room.floor ?? '—'}</span>
+                    </div>
+                    <div className={`absolute top-3 right-3 ${s.badge} text-white px-md py-1 rounded-full text-xs font-bold flex items-center gap-1`}>
+                      <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>circle</span>
+                      {s.label}
+                    </div>
                   </div>
-                  <a className="text-xs font-bold text-blue-700 hover:underline cursor-pointer" href="/room-detail">View Details</a>
-                </div>
-              </div>
-            </div>
-
-            {/* Room Card 2 (Deluxe - Available) */}
-            <div className="bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md transition-shadow group overflow-hidden flex flex-col border border-slate-100">
-              <div className="relative h-40 overflow-hidden">
-                <img className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" data-alt="A spacious deluxe hotel room with two queen beds, minimalist grey headboards, and accent pillows in deep blue. The room is bright with natural daylight, featuring light oak flooring and modern abstract art on the walls. The aesthetic is clean, professional, and welcoming, embodying modern corporate travel standards." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCcYbseUJh_4mhE6skEYSdAkkyzG_4O_Q_bcOs-fSw5si6pBxOr9_tBNTU0tlfkmG0fiQRhXCnCrc8WfYdTh3ZhF1YPF4tbLXsaFa7S8I9fc3pww1B3sXirmr7jyuGbIJWgQ72zmTKqP2cwQVqpJZHbyTdsV4s8Z3nsIqktgcyK0V5A0trRsAIiBcTenTbpzj1OiXTmcKFhdxVIkOnsPgOB6FLuNDR7GCGgpEoIBCxf3ieSudj8Y62KHxDxLUj3fTBhbhCZylG94GQ" />
-                <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-sm py-1 rounded shadow-sm">
-                  <span className="text-xs font-bold text-primary tracking-widest uppercase">Floor 2</span>
-                </div>
-                <div className="absolute top-3 right-3 bg-green-600 text-white px-md py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                  <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-                  Available
-                </div>
-              </div>
-              <div className="p-lg flex flex-col flex-1">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-h3 font-h3 text-on-surface">Deluxe 212</h3>
-                  <button className="text-slate-400 hover:text-primary transition-colors">
-                    <span className="material-symbols-outlined">more_vert</span>
-                  </button>
-                </div>
-                <p className="text-body-sm text-secondary mb-md">Deluxe Twin Room • Garden View</p>
-                <div className="mt-auto pt-md border-t border-slate-100 flex justify-between items-center">
-                  <div className="flex items-center gap-1 text-on-surface-variant">
-                    <span className="material-symbols-outlined text-[18px]">cleaning_services</span>
-                    <span className="text-data-tabular">Ready</span>
+                  <div className="p-lg flex flex-col flex-1">
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="text-h3 font-h3 text-on-surface">Room {room.room_number}</h3>
+                    </div>
+                    <p className="text-body-sm text-secondary mb-md">{room.room_types?.name ?? 'Room'}</p>
+                    <div className="mt-auto pt-md border-t border-slate-100 flex justify-between items-center gap-2">
+                      <label className="text-[11px] font-bold text-secondary uppercase tracking-wider">Status</label>
+                      <select
+                        value={room.status}
+                        onChange={(e) => changeStatus(room, e.target.value as Room['status'])}
+                        className="border-outline-variant bg-surface rounded-lg text-xs font-bold px-2 py-1 focus:ring-blue-700 outline-none"
+                      >
+                        {STATUS_ORDER.map((st) => (
+                          <option key={st} value={st}>{STATUS_STYLES[st].label}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                  <button className="bg-primary-container text-white px-md py-1 rounded text-xs font-bold hover:opacity-90">Assign</button>
                 </div>
-              </div>
-            </div>
-
-            {/* Room Card 3 (Standard - Dirty) */}
-            <div className="bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md transition-shadow group overflow-hidden flex flex-col border border-slate-100">
-              <div className="relative h-40 overflow-hidden">
-                <div className="absolute inset-0 bg-slate-900/40 z-10"></div>
-                <img className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" data-alt="A cozy standard hotel room seen from the doorway after checkout. The bedding is slightly ruffled, and light filters through partially closed curtains. The room features a warm color palette of beiges and browns with dark wood accents. The mood is transitionary, awaiting service, within a professionally managed property setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAH5Bq8z3KJ9VBgHjdUU941blLt7Cj4RQvFxX5Gf02hRmDU-wpK2uElmGjkCcwSxLJJ6ZYNlFQZk5UuhlKJAFJk5WAM8nKOMFhWeSfYwUBOj2YVtLz4OQRe7mi7eREZENSWcKd20OMdq9B5kGxAV7ENKQfl7Fb9agpLLF4RedYwnhqIsIGPzgTLWBb-yYBERL1J3_x62i06fIsCELZZknHW40mp8-scskYBMpqNZud9iRPzMnOdKRkQYcXDHuh6oNiG1FQrxd6Zyao" />
-                <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-sm py-1 rounded shadow-sm z-20">
-                  <span className="text-xs font-bold text-primary tracking-widest uppercase">Floor 1</span>
-                </div>
-                <div className="absolute top-3 right-3 bg-red-600 text-white px-md py-1 rounded-full text-xs font-bold flex items-center gap-1 z-20">
-                  <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>mop</span>
-                  Dirty
-                </div>
-              </div>
-              <div className="p-lg flex flex-col flex-1">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-h3 font-h3 text-on-surface">Room 105</h3>
-                  <button className="text-slate-400 hover:text-primary transition-colors">
-                    <span className="material-symbols-outlined">more_vert</span>
-                  </button>
-                </div>
-                <p className="text-body-sm text-secondary mb-md">Standard Single • Courtyard</p>
-                <div className="mt-auto pt-md border-t border-slate-100 flex justify-between items-center">
-                  <div className="flex items-center gap-1 text-red-600 font-bold">
-                    <span className="material-symbols-outlined text-[18px]">schedule</span>
-                    <span className="text-xs uppercase">Needs Service</span>
-                  </div>
-                  <span className="text-xs font-bold text-blue-700 hover:underline cursor-pointer">Notify Staff</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Room Card 4 (Deluxe - Maintenance) */}
-            <div className="bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md transition-shadow group overflow-hidden flex flex-col border border-slate-100">
-              <div className="relative h-40 overflow-hidden">
-                <div className="absolute inset-0 bg-slate-900/60 z-10 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-white text-4xl">build</span>
-                </div>
-                <img className="w-full h-full object-cover" data-alt="A modern hotel corridor with architectural lighting and sleek doors. The perspective focuses on a specific room door where a professional maintenance sign is hung. The lighting is low and dramatic, with cool blue and warm orange contrasts, suggesting a high-end commercial property under professional upkeep." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCSZ0yDWd583OAT_HUnotIHeH6APxIczU1XnpiooGm-aqsvskJNZZErbGzgeHMxAiWRdj7iB-yCxDKq6GHL0hN1APwpOjoRm6uzVV6mnlpqzl0zAYoKh0D0wf63BrJKFDSdu0og-uq9zJdXuU-SnJ3ASJr-e2M4iW_sstlypK2My0jX6JBFkUi2HVQzEb84F_KpmD4ZIJxBohh05VfLMoUPabBQDd3DiVJGOljYFiiTdlqQksMPO9orvziQhR_vPW7_uhXcbSUC4vY" />
-                <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-sm py-1 rounded shadow-sm z-20">
-                  <span className="text-xs font-bold text-primary tracking-widest uppercase">Floor 3</span>
-                </div>
-                <div className="absolute top-3 right-3 bg-slate-700 text-white px-md py-1 rounded-full text-xs font-bold flex items-center gap-1 z-20">
-                  <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>engineering</span>
-                  Maintenance
-                </div>
-              </div>
-              <div className="p-lg flex flex-col flex-1">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-h3 font-h3 text-on-surface">Deluxe 302</h3>
-                  <button className="text-slate-400 hover:text-primary transition-colors">
-                    <span className="material-symbols-outlined">more_vert</span>
-                  </button>
-                </div>
-                <p className="text-body-sm text-secondary mb-md">Deluxe Queen • City Center View</p>
-                <div className="mt-auto pt-md border-t border-slate-100 flex justify-between items-center">
-                  <div className="flex items-center gap-1 text-slate-500">
-                    <span className="material-symbols-outlined text-[18px]">warning</span>
-                    <span className="text-xs">AC Unit Repair</span>
-                  </div>
-                  <span className="text-xs font-bold text-blue-700 hover:underline cursor-pointer">Service Log</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Room Card 5 (Suite - Occupied) */}
-            <div className="bg-surface-container-lowest rounded-xl shadow-sm hover:shadow-md transition-shadow group overflow-hidden flex flex-col border border-slate-100">
-              <div className="relative h-40 overflow-hidden">
-                <img className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" data-alt="The living area of a luxury hotel suite with a velvet sofa, a sleek workspace, and premium amenities like a high-end espresso machine. Warm evening light flows into the room, illuminating soft textures and refined materials. The scene is sophisticated and intimate, conveying the prestige of a premium suite booking." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC6ELOJO7SI0Xpt2F_nI8OoHzSXk6rmlOuH5puXMwWN4mTsE6fV2cs-diUmGfZRWqPAQGazRXF8elc9I3Lthxd6YjVMhQccL72AIzFS8TewTYoqnMtB4BCfOUitf0gJlLyBcGFw-mfwncMZZwI9FF4CEujodmBQtd8v2Cwrc_gzWiPBdQJ_wTsEKlwtEyrqUiXjMVoroKszd51xL705eVB70GiE5P-GgjxbxlBAxOmW7H6OuTdVJN8tXO4vZqQE4ZCQbSe1m8mibtE" />
-                <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-sm py-1 rounded shadow-sm">
-                  <span className="text-xs font-bold text-primary tracking-widest uppercase">Floor 4</span>
-                </div>
-                <div className="absolute top-3 right-3 bg-orange-500 text-white px-md py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                  <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>person</span>
-                  Occupied
-                </div>
-              </div>
-              <div className="p-lg flex flex-col flex-1">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-h3 font-h3 text-on-surface">Suite 405</h3>
-                  <button className="text-slate-400 hover:text-primary transition-colors">
-                    <span className="material-symbols-outlined">more_vert</span>
-                  </button>
-                </div>
-                <p className="text-body-sm text-secondary mb-md">Penthouse Suite • Private Terrace</p>
-                <div className="mt-auto pt-md border-t border-slate-100 flex justify-between items-center">
-                  <div className="flex items-center gap-1 text-on-surface-variant">
-                    <span className="material-symbols-outlined text-[18px]">verified</span>
-                    <span className="text-data-tabular">VIP Guest</span>
-                  </div>
-                  <a className="text-xs font-bold text-blue-700 hover:underline cursor-pointer" href="/room-detail">Manage Stay</a>
-                </div>
-              </div>
-            </div>
+              );
+            })}
 
             {/* Add Room Placeholder */}
             <a className="border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center p-lg group cursor-pointer hover:border-blue-700 hover:bg-blue-50/30 transition-all min-h-[320px]" href="/new-room">
