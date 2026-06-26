@@ -11,22 +11,43 @@ const BookingCalendar: React.FC = () => {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Compute Mon–Sun of the current week.
+  // `anchor` is any date within the week currently being viewed.
+  // Changing it lets the admin page back and forth through weeks.
+  const [anchor, setAnchor] = useState(() => new Date());
+
+  // Compute Mon–Sun of the week containing `anchor`.
   const weekDays = useMemo(() => {
-    const now = new Date();
-    const day = (now.getDay() + 6) % 7; // 0 = Monday
-    const monday = new Date(now);
-    monday.setDate(now.getDate() - day);
+    const day = (anchor.getDay() + 6) % 7; // 0 = Monday
+    const monday = new Date(anchor);
+    monday.setDate(anchor.getDate() - day);
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
       return d;
     });
-  }, []);
+  }, [anchor]);
+
+  const shiftWeeks = (weeks: number) =>
+    setAnchor((prev) => {
+      const next = new Date(prev);
+      next.setDate(prev.getDate() + weeks * 7);
+      return next;
+    });
+  const goToday = () => setAnchor(new Date());
+
+  const weekLabel = `${weekDays[0].toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  })} – ${weekDays[6].toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })}`;
 
   useEffect(() => {
     const from = weekDays[0].toISOString().slice(0, 10);
     const to = weekDays[6].toISOString().slice(0, 10);
+    setLoading(true);
     hotelService
       .getCalendar(from, to)
       .then((r) => setBookings(r.data))
@@ -104,7 +125,7 @@ const BookingCalendar: React.FC = () => {
               <p className="text-xs font-bold">Admin User</p>
               <p className="text-[10px] text-slate-500">Corporate Manager</p>
             </div>
-            <img alt="Administrator Profile Avatar" className="w-8 h-8 rounded-full border-2 border-white shadow-sm" data-alt="A professional headshot of a corporate male administrator in a clean minimalist office setting. Soft, diffuse morning light enters through a large window, creating a modern and calm business atmosphere. The person is wearing a tailored grey suit with a confident and approachable expression. The overall style is high-end corporate photography with a neutral, bright color palette." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC6crhkSvg14TnyfWNJsaIFvk0RnTqbdxiVn6Pbw1adV2Piw5nPgxhtYp6cVxCi-__BpVa5G0pXlAkWoIbMDgZ6P2F8H270Y1HvQKFvVsJKptitMORdEU3qEeBqdTtKWQTY_qWp2D07ShP3GwL2s7H8uF8gIwREbh4ISrMc_Nt50kLXFRGeWKxiiS7JYHKt6lnaFLFHrbWo9rbmdnPKbIn27y-ysELgBMdlMWwd0Mv4AgoarTEr-O8hRwbpHPA8wk0oo4N73-tyDi0" />
+            <img alt="Administrator Profile Avatar" className="w-8 h-8 rounded-full border-2 border-white shadow-sm" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC6crhkSvg14TnyfWNJsaIFvk0RnTqbdxiVn6Pbw1adV2Piw5nPgxhtYp6cVxCi-__BpVa5G0pXlAkWoIbMDgZ6P2F8H270Y1HvQKFvVsJKptitMORdEU3qEeBqdTtKWQTY_qWp2D07ShP3GwL2s7H8uF8gIwREbh4ISrMc_Nt50kLXFRGeWKxiiS7JYHKt6lnaFLFHrbWo9rbmdnPKbIn27y-ysELgBMdlMWwd0Mv4AgoarTEr-O8hRwbpHPA8wk0oo4N73-tyDi0" />
           </div>
         </div>
       </header>
@@ -118,10 +139,30 @@ const BookingCalendar: React.FC = () => {
             <p className="text-body-sm text-secondary">Manage property occupancy and upcoming arrivals.</p>
           </div>
           <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 px-4 py-2 bg-white border border-outline-variant rounded-lg text-body-md font-medium text-on-surface hover:bg-surface-container transition-colors shadow-sm">
+            <button
+              onClick={goToday}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-outline-variant rounded-lg text-body-md font-medium text-on-surface hover:bg-surface-container transition-colors shadow-sm"
+            >
               <span className="material-symbols-outlined text-[20px]">calendar_today</span>
               Today
             </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => shiftWeeks(-1)}
+                aria-label="Previous week"
+                className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-surface-container transition-colors"
+              >
+                <span className="material-symbols-outlined text-[20px]">chevron_left</span>
+              </button>
+              <span className="min-w-[180px] text-center text-body-md font-bold text-primary">{weekLabel}</span>
+              <button
+                onClick={() => shiftWeeks(1)}
+                aria-label="Next week"
+                className="p-2 rounded-lg text-secondary hover:text-primary hover:bg-surface-container transition-colors"
+              >
+                <span className="material-symbols-outlined text-[20px]">chevron_right</span>
+              </button>
+            </div>
             <div className="flex items-center gap-1 bg-surface-container rounded-lg p-1">
               <button className="px-3 py-1.5 text-xs font-bold rounded-md bg-white shadow-sm text-primary">Week</button>
               <button className="px-3 py-1.5 text-xs font-medium text-secondary hover:text-primary">Month</button>
@@ -165,7 +206,7 @@ const BookingCalendar: React.FC = () => {
           {/* Scrollable Grid Body — one row per booking this week */}
           <div className="flex-1 overflow-y-auto scrollbar-hide">
             {loading && (
-              <div className="p-6 text-center text-secondary">Loading this week’s bookings…</div>
+              <div className="p-6 text-center text-secondary">Loading bookings…</div>
             )}
             {!loading && bookings.length === 0 && (
               <div className="p-6 text-center text-secondary">No bookings scheduled this week.</div>
@@ -198,7 +239,7 @@ const BookingCalendar: React.FC = () => {
               );
             })}
           </div>
-          
+
           {/* Calendar Footer Summary */}
           <div className="p-4 bg-surface-container border-t border-slate-100 flex items-center justify-between">
             <div className="flex gap-6">
