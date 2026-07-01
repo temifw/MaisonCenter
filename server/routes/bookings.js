@@ -54,6 +54,32 @@ router.post("/", async (req, res, next) => {
   }
 });
 
+// POST /api/bookings/lookup  -> retrieve one booking by code + email (PUBLIC)
+// Replaces customer login: a guest finds their reservation using the
+// booking code we gave them plus the email on the booking. The database
+// RPC only returns a row when BOTH match, and only exposes safe fields.
+router.post("/lookup", async (req, res, next) => {
+  try {
+    const { code, email } = req.body || {};
+    if (!code || !email) {
+      return res.status(400).json({ error: "Booking code and email are required." });
+    }
+    const { data, error } = await req.db.rpc("get_booking_by_code", {
+      p_code: code,
+      p_email: email,
+    });
+    if (error) return res.status(400).json({ error: error.message });
+    if (!data) {
+      // Same message whether the code is wrong or the email doesn't match,
+      // so we don't reveal which codes exist.
+      return res.status(404).json({ error: "No booking found for that code and email." });
+    }
+    res.json(data);
+  } catch (e) {
+    next(e);
+  }
+});
+
 // GET /api/bookings/calendar?from=&to=  (staff)
 // Active bookings overlapping the window, for the admin calendar.
 // Declared BEFORE "/" semantics don't clash, but kept explicit.

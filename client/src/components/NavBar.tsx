@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
 
 const NavBar = () => {
-  const { user, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentPath, setCurrentPath] = useState(window.location.pathname);
 
@@ -31,11 +29,7 @@ const NavBar = () => {
             <a className={`font-serif tracking-[0.15em] uppercase text-sm transition-colors duration-300 ${isActive('/')}`} href="/">Home</a>
             <a className={`font-serif tracking-[0.15em] uppercase text-sm transition-colors duration-300 ${isActive('/rooms')}`} href="/rooms">Rooms</a>
             <a className={`font-serif tracking-[0.15em] uppercase text-sm transition-colors duration-300 ${isActive('/about')}`} href="/about">About</a>
-            {user ? (
-              <button onClick={logout} className="font-serif tracking-[0.15em] uppercase text-sm text-stone-600 hover:text-[#776E20] transition-colors duration-300">Sign Out</button>
-            ) : (
-              <a className={`font-serif tracking-[0.15em] uppercase text-sm transition-colors duration-300 ${isActive('/sign-in')}`} href="/sign-in">Sign In</a>
-            )}
+            <a className={`font-serif tracking-[0.15em] uppercase text-sm transition-colors duration-300 ${isActive('/my-booking')}`} href="/my-booking">My Booking</a>
           </div>
 
           <a href="/book" className="hidden md:block bg-[#776E20] text-white px-8 py-3 font-label-caps text-label-caps tracking-[0.2em] scale-100 active:scale-95 transition-transform">
@@ -59,11 +53,7 @@ const NavBar = () => {
         <a className={`font-serif tracking-[0.15em] uppercase text-2xl transition-colors duration-300 ${isActive('/')}`} href="/" onClick={() => setIsMobileMenuOpen(false)}>Home</a>
         <a className={`font-serif tracking-[0.15em] uppercase text-2xl transition-colors duration-300 ${isActive('/rooms')}`} href="/rooms" onClick={() => setIsMobileMenuOpen(false)}>Rooms</a>
         <a className={`font-serif tracking-[0.15em] uppercase text-2xl transition-colors duration-300 ${isActive('/about')}`} href="/about" onClick={() => setIsMobileMenuOpen(false)}>About</a>
-        {user ? (
-          <button onClick={logout} className="font-serif tracking-[0.15em] uppercase text-2xl text-stone-600">Sign Out</button>
-        ) : (
-          <a className={`font-serif tracking-[0.15em] uppercase text-2xl transition-colors duration-300 ${isActive('/sign-in')}`} href="/sign-in" onClick={() => setIsMobileMenuOpen(false)}>Sign In</a>
-        )}
+        <a className={`font-serif tracking-[0.15em] uppercase text-2xl transition-colors duration-300 ${isActive('/my-booking')}`} href="/my-booking" onClick={() => setIsMobileMenuOpen(false)}>My Booking</a>
         <a href="/book" className="bg-[#776E20] text-white px-10 py-4 mt-8 font-label-caps text-label-caps tracking-[0.2em]">
           RESERVE NOW
         </a>

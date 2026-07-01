@@ -11,12 +11,28 @@ export interface RoomType {
 
 export interface Booking {
   id: string;
+  booking_code: string;
   room_id: string;
   check_in: string;
   check_out: string;
   status: string;
   total_price: number;
   rooms?: { room_number: string; room_types?: { name: string } };
+}
+
+// Shape returned by the public code+email lookup (get_booking_by_code RPC).
+export interface BookingLookup {
+  booking_code: string;
+  status: string;
+  check_in: string;
+  check_out: string;
+  guests_count: number;
+  total_price: number;
+  special_requests?: string | null;
+  created_at: string;
+  guest_name: string;
+  room_number: string;
+  room_type: string;
 }
 
 export interface NewBookingPayload {
@@ -35,6 +51,7 @@ export const hotelService = {
   getAvailability: (roomTypeId: string, checkIn: string, checkOut: string) =>
     apiClient.get('/rooms/availability', { params: { roomTypeId, checkIn, checkOut } }),
   createBooking: (data: NewBookingPayload) => apiClient.post<Booking>('/bookings', data),
-  getMyBookings: () => apiClient.get<Booking[]>('/bookings'),
-  cancelBooking: (id: string) => apiClient.post(`/bookings/${id}/cancel`),
+  // Public: find a reservation with the booking code + the email it was made with.
+  lookupBooking: (code: string, email: string) =>
+    apiClient.post<BookingLookup>('/bookings/lookup', { code, email }),
 };

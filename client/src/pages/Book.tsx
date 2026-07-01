@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import Layout from '../components/Layout';
 import { hotelService, type RoomType, type Booking } from '../services/hotelService';
-import { useAuth } from '../context/AuthContext';
 
 const Book = () => {
-  const { user } = useAuth();
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([]);
   const [roomTypeId, setRoomTypeId] = useState('');
   const [checkIn, setCheckIn] = useState('');
@@ -29,13 +27,6 @@ const Book = () => {
       if (initial) setRoomTypeId(initial);
     }).catch(() => setRoomTypes([]));
   }, []);
-
-  useEffect(() => {
-    if (user) {
-      setGuestName((user.full_name as string) || (user.email as string) || '');
-      setGuestEmail((user.email as string) || '');
-    }
-  }, [user]);
 
   const selected = roomTypes.find((t) => t.id === roomTypeId);
   const nights = useMemo(() => {
@@ -100,8 +91,16 @@ const Book = () => {
             <p className="text-stone-500 font-body-lg mb-8">
               Thank you, {guestName}. {guestEmail ? 'A confirmation has been sent to your email.' : ''}
             </p>
+            <div className="bg-stone-50 border border-[#776E20]/40 p-6 mb-8">
+              <span className="font-label-caps text-stone-500 block mb-2">YOUR BOOKING CODE</span>
+              <span className="font-mono text-2xl tracking-widest text-stone-900">{confirmed.booking_code}</span>
+              <p className="text-stone-500 font-body-md mt-3">
+                Keep this code. Retrieve your reservation anytime at{' '}
+                <a className="text-[#776E20] underline" href="/my-booking">My Booking</a>{' '}
+                using this code and your email.
+              </p>
+            </div>
             <div className="border border-stone-200 p-8 text-left space-y-3 mb-10">
-              <div className="flex justify-between"><span className="text-stone-500">Confirmation #</span><span className="font-mono">{confirmed.id.slice(0, 8)}</span></div>
               <div className="flex justify-between"><span className="text-stone-500">Room</span><span>{selected?.name}</span></div>
               <div className="flex justify-between"><span className="text-stone-500">Check-in</span><span>{confirmed.check_in}</span></div>
               <div className="flex justify-between"><span className="text-stone-500">Check-out</span><span>{confirmed.check_out}</span></div>
@@ -120,11 +119,10 @@ const Book = () => {
         <div className="max-w-4xl mx-auto">
           <span className="font-label-caps text-[#776E20] mb-4 block text-center">RESERVATIONS</span>
           <h1 className="font-display-lg text-4xl md:text-display-lg text-stone-900 mb-4 text-center">Book Your Stay</h1>
-          {!user && (
-            <p className="text-center text-stone-500 font-body-md mb-12">
-              Booking as a guest. <a className="text-[#776E20] underline" href="/sign-in">Sign in</a> to track your reservations.
-            </p>
-          )}
+          <p className="text-center text-stone-500 font-body-md mb-12">
+            After booking you'll get a booking code to view your reservation anytime at{' '}
+            <a className="text-[#776E20] underline" href="/my-booking">My Booking</a>.
+          </p>
 
           <form className="grid md:grid-cols-2 gap-x-12 gap-y-8 mt-8" onSubmit={handleSubmit}>
             <div className="md:col-span-2">
