@@ -1,31 +1,35 @@
-{
-  "name": "maisoncenter",
-  "version": "1.0.0",
-  "description": "Hotel Website",
-  "homepage": "https://github.com/404Temi/MaisonCenter#readme",
-  "bugs": {
-    "url": "https://github.com/404Temi/MaisonCenter/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/404Temi/MaisonCenter.git"
-  },
-  "license": "ISC",
-  "author": "",
-  "type": "commonjs",
-  "main": "server/index.js",
-  "scripts": {
-    "start": "node server/index.js",
-    "dev": "nodemon server/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.108.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^5.2.1"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.14"
-  }
-}
+{
+  "name": "maisoncenter",
+  "version": "1.0.0",
+  "description": "Hotel Website",
+  "homepage": "https://github.com/404Temi/MaisonCenter#readme",
+  "bugs": {
+    "url": "https://github.com/404Temi/MaisonCenter/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/404Temi/MaisonCenter.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "nodemon server/index.js",
+    "email:verify": "node server/scripts/test-email.js --verify",
+    "email:test": "node server/scripts/test-email.js",
+    "email:preview": "node server/scripts/test-email.js --verify --preview",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.108.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^5.2.1",
+    "nodemailer": "^9.0.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}

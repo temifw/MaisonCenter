@@ -19,6 +19,9 @@
 .env.test.local
 .env.production.local
 
+# local email render output from server/scripts/test-email.js --preview
+email-preview.html
+
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
