@@ -1,228 +1,306 @@
-# Deploying to Vercel — client demo setup
+# Deploying Maison Center to Vercel
 
-Everything runs on Vercel as **three separate projects** from this one
-repo. Email is *not* required — the app works fine without SMTP, so you
-can deploy today and finish `EMAIL_SETUP.md` later.
+Three Vercel projects from one repo. Email is **not** required — with no
+`SMTP_*` variables set the app logs one warning and works normally, so
+you can deploy today and finish [docs/EMAIL_SETUP.md](docs/EMAIL_SETUP.md)
+later.
 
-| Project | Root directory | What it is | Example URL |
-| --- | --- | --- | --- |
-| `maisoncenter-api` | `.` (repo root) | Express API as a serverless function | `maisoncenter-api.vercel.app` |
-| `maisoncenter-client` | `client` | Customer site (Vite SPA) | `maisoncenter.vercel.app` |
-| `maisoncenter-admin` | `admin` | Staff dashboard (Vite SPA) | `maisoncenter-admin.vercel.app` |
+| Project | Root Directory | What it is |
+| --- | --- | --- |
+| `maisoncenter-api` | `.` (repo root) | Express API as a serverless function |
+| `maisoncenter-client` | `client` | Customer site (Vite SPA) |
+| `maisoncenter-admin` | `admin` | Staff dashboard (Vite SPA) |
 
-**Deploy the API first.** Both front ends need its URL baked in at build
-time, so deploying them first means an immediate redeploy.
-
----
-
-## What already changed in the repo
-
-| File | Why |
-| --- | --- |
-| `api/index.js` | New. Vercel's entry point — hands the Express app to the serverless runtime. |
-| `server/index.js` | `app.listen()` now only runs when `process.env.VERCEL` is unset. CORS accepts an allow-list plus optional `*.vercel.app` previews. |
-| `vercel.json` | New. Rewrites every path to the API function. |
-| `.vercelignore` | New. Keeps `client/`, `admin/` and `supabase/` out of the API deploy. |
-| `admin/vercel.json` | New. SPA rewrites — without this, refreshing `/rooms` in the admin 404s. |
-| `client/.env.example`, `admin/.env.example` | New. Documents `VITE_API_URL`. |
-| `server/routes/bookings.js` | Awaits the confirmation email on serverless (see "Email on serverless" below). |
-| `server/lib/email.js` | Disables SMTP connection pooling on serverless. |
-
-Nothing here changes local development: `npm run dev` still binds port 3000.
+**Order matters: deploy the API first.** Both front ends bake its URL in
+at build time, so doing them first means an immediate rebuild.
 
 ---
 
-## Step 1 — Deploy the API
+## Part 1 — Pre-flight (do this before touching Vercel)
 
-1. Push your work to GitHub.
+### 1.1 Untrack `client/node_modules` — this is mandatory
+
+`client/node_modules` is committed: **3,865 files, 39 MB in git**,
+installed on Windows. Vercel clones it, npm fails to reconcile the
+Linux-native build tooling on top of it, and the build dies with:
+
+```
+Command "npm run build" exited with 254
+```
+
+`.gitignore` already lists `node_modules`, but **ignore rules don't
+apply to files Git already tracks**. You have to untrack it explicitly:
+
+```bash
+git rm -r --cached client/node_modules
+git rm --cached client/.env admin/.env
+git rm -r --cached supabase/.temp
+git commit -m "Stop tracking node_modules, env files and Supabase CLI state"
+git push
+```
+
+`--cached` only updates the index — **your local files are untouched**,
+and `npm run dev` keeps working.
+
+This was verified, not guessed: a clean checkout of `client/` with the
+same `package-lock.json` on Node 22 builds successfully in under a
+second. The lockfile correctly lists `@rolldown/binding-linux-x64-gnu`.
+The only difference between that and the failing Vercel build is the
+committed `node_modules`.
+
+### 1.2 Confirm secrets aren't tracked
+
+```bash
+git ls-files | grep -E "node_modules/|/\.env$|supabase/\.temp/"
+```
+
+Should print **nothing** after 1.1. `server/.env` — which holds the
+Supabase service role key and, later, your SMTP password — has never
+been tracked; keep it that way.
+
+The `client/.env` and `admin/.env` files hold no secrets (`VITE_` values
+ship in the browser bundle by design), but they point at `localhost` and
+will confuse you later. `.env.example` files are committed in their place.
+
+### 1.3 Check the builds pass locally
+
+```bash
+npm --prefix client run build     # expect dist/ with index.html + assets
+npm --prefix admin  run build
+```
+
+Both currently pass on Node 22.12+. If they fail locally they'll fail on
+Vercel — fix them here, where the feedback loop is seconds not minutes.
+
+### 1.4 Have your Supabase keys ready
+
+From Supabase → Project Settings → API:
+
+- Project URL
+- `anon` / publishable key — safe to expose, protected by RLS
+- `service_role` key — **bypasses RLS**, server-only, never in a `VITE_` var
+
+> `SUPABASE_SERVICE_ROLE_KEY` is currently missing from your local
+> `server/.env`. Staff login and the staff checks in
+> `middleware/auth.js` fall back to the anon client without it, so the
+> **admin dashboard needs this** to work.
+
+---
+
+## Part 2 — Deploy the API
+
+1. Push to GitHub.
 2. **vercel.com → Add New → Project → import `404Temi/MaisonCenter`.**
-3. Configure:
-   - **Project Name**: `maisoncenter-api`
-   - **Root Directory**: leave as `./` (the repo root)
-   - **Framework Preset**: **Other**
-   - **Build Command**: leave empty
-   - **Output Directory**: leave empty
-4. Add **Environment Variables** (copy the values from your local
-   `server/.env`):
+3. Settings:
 
-   | Name | Value |
+   | Setting | Value |
    | --- | --- |
-   | `SUPABASE_URL` | `https://your-project.supabase.co` |
-   | `SUPABASE_ANON_KEY` | your anon key |
-   | `SUPABASE_SERVICE_ROLE_KEY` | your service role key — **needed for staff login** |
-   | `CORS_ORIGINS` | leave blank for now; you'll fill it in at Step 4 |
-   | `ALLOW_VERCEL_PREVIEWS` | `true` |
+   | Project Name | `maisoncenter-api` |
+   | Root Directory | `./` (leave as the repo root) |
+   | Framework Preset | **Other** |
+   | Build Command | *leave empty* |
+   | Output Directory | *leave empty* |
+   | Node.js Version | 22.x |
 
-5. **Deploy**, then confirm it's alive:
+4. Environment Variables:
+
+   | Name | Value | Notes |
+   | --- | --- | --- |
+   | `SUPABASE_URL` | `https://xxxx.supabase.co` | |
+   | `SUPABASE_ANON_KEY` | your anon key | |
+   | `SUPABASE_SERVICE_ROLE_KEY` | your service role key | needed for staff login |
+   | `ALLOW_VERCEL_PREVIEWS` | `true` | lets preview deploys pass CORS |
+   | `CORS_ORIGINS` | *leave blank for now* | filled in at Part 5 |
+
+5. **Deploy**, then check:
 
    ```
-   https://maisoncenter-api.vercel.app/health
+   https://maisoncenter-api.vercel.app/health   ->  {"ok":true}
    ```
 
-   You want `{"ok":true}`. Note the domain — you need it twice below.
+   Note the domain — you need it twice below.
 
-> **`SUPABASE_SERVICE_ROLE_KEY` is currently missing from your local
-> `server/.env`.** Staff login and the staff checks in
-> `middleware/auth.js` fall back to the anon client without it. If the
-> admin dashboard is part of the demo, grab the key from Supabase →
-> Project Settings → API and add it here. It bypasses RLS, so it belongs
-> only in the API project's env vars — never in a `VITE_` variable.
-
----
-
-## Step 2 — Deploy the customer site
-
-1. **Add New → Project → import the same repo again.**
-2. Configure:
-   - **Project Name**: `maisoncenter-client`
-   - **Root Directory**: **`client`** ← click Edit and select the folder
-   - **Framework Preset**: Vite (auto-detected)
-3. Environment Variables:
-
-   | Name | Value |
-   | --- | --- |
-   | `VITE_API_URL` | `https://maisoncenter-api.vercel.app/api` |
-   | `VITE_APP_NAME` | `Hotel Booking` |
-
-   Mind the `/api` suffix — the code appends paths like `/rooms/types`
-   directly to this value.
-
-4. **Deploy.**
+**How this works:** `api/index.js` exports the Express app (an Express
+app *is* a `(req, res)` handler, so no adapter is needed).
+`server/index.js` skips `app.listen()` when `process.env.VERCEL` is set,
+so the same file still runs as a normal server locally. The root
+`vercel.json` rewrites every path to that function, and `req.url` keeps
+the original path — so `/api/rooms` still matches `app.use("/api", ...)`.
 
 ---
 
-## Step 3 — Deploy the admin dashboard
+## Part 3 — Deploy the customer site
 
-Same again, with:
+**Add New → Project → import the same repo again.** Set all five fields
+explicitly; do not rely on auto-detection.
 
-- **Project Name**: `maisoncenter-admin`
-- **Root Directory**: **`admin`**
-- `VITE_API_URL` = `https://maisoncenter-api.vercel.app/api`
-- `VITE_APP_NAME` = `Hotel Admin`
+| Setting | Value |
+| --- | --- |
+| Project Name | `maisoncenter-client` |
+| Root Directory | **`client`** ← click Edit and pick the folder |
+| Framework Preset | **Vite** |
+| Build Command | `npm run build` |
+| Output Directory | `dist` |
+| Node.js Version | 22.x |
 
-`admin/vercel.json` (added for you) handles client-side routing.
+Environment Variables:
+
+| Name | Value |
+| --- | --- |
+| `VITE_API_URL` | `https://maisoncenter-api.vercel.app/api` |
+| `VITE_APP_NAME` | `Hotel Booking` |
+
+Mind the `/api` suffix — the code appends paths like `/rooms/types`
+straight onto this value.
+
+> **The Framework Preset trap.** Left as **Other**, Vercel skips the
+> build entirely and serves `client/public/` — which has no
+> `index.html`, so every route returns `404: NOT_FOUND`. The giveaway is
+> a suspiciously fast (<15s) deploy plus the log warning *"Build output
+> contains no functions or static directory."*
+>
+> Use `npm run build`, not Vite's default `vite build` — your script is
+> `tsc -b && vite build` and you want the type check running too.
 
 ---
 
-## Step 4 — Point CORS back at the front ends
+## Part 4 — Deploy the admin dashboard
 
-The API now needs to know who's allowed to call it.
+Identical to Part 3, including the Framework Preset trap.
 
-1. Go to the **`maisoncenter-api`** project → Settings → Environment
-   Variables → edit `CORS_ORIGINS`:
+| Setting | Value |
+| --- | --- |
+| Project Name | `maisoncenter-admin` |
+| Root Directory | **`admin`** |
+| Framework Preset | **Vite** |
+| Build Command | `npm run build` |
+| Output Directory | `dist` |
+
+| Name | Value |
+| --- | --- |
+| `VITE_API_URL` | `https://maisoncenter-api.vercel.app/api` |
+| `VITE_APP_NAME` | `Hotel Admin` |
+
+`client/vercel.json` and `admin/vercel.json` handle SPA routing — without
+them, refreshing on `/rooms` returns 404.
+
+---
+
+## Part 5 — Point CORS back at the front ends
+
+1. **`maisoncenter-api`** → Settings → Environment Variables → set
+   `CORS_ORIGINS`:
 
    ```
    https://maisoncenter-client.vercel.app,https://maisoncenter-admin.vercel.app
    ```
 
-   Comma-separated, **no trailing slashes**, and use your real domains.
-2. **Redeploy the API** — env var changes don't apply to a running
-   deployment. Deployments → ⋯ → Redeploy.
+   Comma-separated, **no trailing slashes**, your real domains.
 
-Leaving `CORS_ORIGINS` empty allows every origin. Fine for an afternoon
-demo, but don't ship it that way.
+2. **Redeploy the API.** Env changes don't apply to a running
+   deployment — Deployments → ⋯ → Redeploy.
+
+Leaving `CORS_ORIGINS` blank allows every origin. Fine for an afternoon
+demo, not for production.
 
 ---
 
-## Step 5 — Smoke test
+## Part 6 — Environment variable reference
 
-Open the customer site and walk the flow your client will:
+### API project (`maisoncenter-api`)
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `SUPABASE_URL` | **yes** | Throws at import if missing |
+| `SUPABASE_ANON_KEY` | **yes** | Throws at import if missing |
+| `SUPABASE_SERVICE_ROLE_KEY` | for admin | Staff login and staff checks |
+| `CORS_ORIGINS` | recommended | Blank = allow all |
+| `ALLOW_VERCEL_PREVIEWS` | optional | Trust `*.vercel.app` preview URLs |
+| `SMTP_HOST` `SMTP_PORT` `SMTP_USER` `SMTP_PASS` | later | Absent = email disabled |
+| `FROM_EMAIL` `FROM_NAME` `REPLY_TO` `BCC_EMAIL` | later | Sender identity |
+| `HOTEL_NAME` `HOTEL_ADDRESS` `HOTEL_PHONE` `HOTEL_EMAIL` | later | Shown in the email |
+| `SITE_URL` | later | Builds the "Manage your booking" link |
+| `EMAIL_TIMEOUT_MS` | optional | Default 8000 (serverless only) |
+
+Do **not** set `PORT` on Vercel — serverless doesn't bind a port.
+
+### Front-end projects
+
+| Variable | Notes |
+| --- | --- |
+| `VITE_API_URL` | Must end in `/api` |
+| `VITE_APP_NAME` | Display only |
+
+Only `VITE_`-prefixed variables reach the browser, and they're **inlined
+at build time**. Changing one requires a redeploy, not a restart. Never
+put a secret in one.
+
+---
+
+## Part 7 — Smoke test
+
+Walk the flow your client will:
 
 - [ ] **Home** loads with images
-- [ ] **Rooms** lists room types *(proves the API and Supabase RLS work)*
-- [ ] **Book** — pick dates, submit, get a `MC-XXXXXXXX` code back
-- [ ] **My Booking** — retrieve that booking with the code + email
-- [ ] Refresh the page on `/rooms` — should load, not 404 *(proves SPA rewrites)*
+- [ ] **Rooms** lists room types *(proves API + Supabase RLS)*
+- [ ] **Book** — pick dates, submit, get an `MC-XXXXXXXX` code back
+- [ ] **My Booking** — retrieve it with that code + the email used
+- [ ] Refresh directly on `/rooms` — loads, doesn't 404 *(proves SPA rewrites)*
 - [ ] Admin — sign in, see the booking you just made
-
-If Rooms is empty, open DevTools → Network. A red CORS error means
-Step 4; a call to `localhost:3000` means `VITE_API_URL` didn't take —
-see the table below.
+- [ ] `/health` on the API returns `{"ok":true}`
 
 ---
 
-## Email on serverless
+## Part 8 — Troubleshooting
 
-You don't need SMTP for the demo. With no `SMTP_*` variables set, the
-email module logs one warning and no-ops; bookings succeed normally.
-
-When you do finish `EMAIL_SETUP.md`, add `SMTP_HOST`, `SMTP_PORT`,
-`SMTP_USER`, `SMTP_PASS`, `FROM_EMAIL`, `FROM_NAME`, plus the `HOTEL_*`
-values and `SITE_URL` to the **API** project.
-
-One behavioural difference is already handled in code, but worth
-understanding. On a normal server the confirmation email is fired
-without `await` so the guest gets their booking code instantly. On
-serverless that's unsafe — Vercel can freeze the instance the moment you
-respond, and a detached promise silently never runs. So
-`routes/bookings.js` detects `process.env.VERCEL` and awaits the send,
-capped at 8 seconds (`EMAIL_TIMEOUT_MS`) so a hanging mail server can't
-stall the booking response. Connection pooling is disabled on serverless
-for the same reason: sockets can't survive between invocations.
-
----
-
-## Troubleshooting
+Every row below is a failure actually seen on this project.
 
 | Symptom | Cause and fix |
 | --- | --- |
-| Site loads, but Rooms is empty and DevTools shows calls to `localhost:3000` | `VITE_API_URL` wasn't set, or was set *after* the build. Vite inlines env vars at build time — set it, then **redeploy**. A restart isn't enough. |
-| `blocked by CORS policy` in the console | `CORS_ORIGINS` doesn't include that exact origin, or you didn't redeploy the API after editing it. Check for a trailing slash. |
-| Preview deploy fails CORS but production works | Preview URLs get random subdomains. Set `ALLOW_VERCEL_PREVIEWS=true` on the API project. |
-| `404: NOT_FOUND` on every API route | The API project's Root Directory isn't the repo root, or `vercel.json` wasn't committed. |
-| API returns 500 immediately | `SUPABASE_URL` / `SUPABASE_ANON_KEY` missing — `lib/supabase.js` throws at import. Check the Runtime Logs. |
-| Refreshing `/rooms` gives 404 | Missing SPA rewrites. `client/vercel.json` and `admin/vercel.json` both exist now; confirm they were committed. |
-| Admin login fails but the customer site works | `SUPABASE_SERVICE_ROLE_KEY` missing on the API project. |
-| Build fails in `client` with a rolldown/native binding error | Stale committed `node_modules` — see below. |
-| First request after idle is slow | Serverless cold start. Normal; usually a second or two. |
+| `npm run build` exits **254** | Committed `client/node_modules`. Part 1.1. |
+| `404: NOT_FOUND` everywhere, deploy <15s, *"Build output contains no functions or static directory"* | Framework Preset is **Other**, so the build never ran. Set it to **Vite** + `npm run build` + `dist`, then redeploy. |
+| Site loads but Rooms is empty; DevTools shows calls to `localhost:3000` | `VITE_API_URL` unset, or set *after* the build. Set it, then **redeploy**. |
+| `blocked by CORS policy` | `CORS_ORIGINS` missing that exact origin, or the API wasn't redeployed after editing it. Check for trailing slashes. |
+| Preview deploys fail CORS, production works | Preview URLs are randomly generated. Set `ALLOW_VERCEL_PREVIEWS=true`. |
+| API 500s instantly on every route | `SUPABASE_URL` / `SUPABASE_ANON_KEY` missing — `lib/supabase.js` throws at import. Check Runtime Logs. |
+| Admin login fails, customer site fine | `SUPABASE_SERVICE_ROLE_KEY` missing on the API project. |
+| Refreshing `/rooms` 404s | SPA rewrites missing — confirm `client/vercel.json` / `admin/vercel.json` were committed. |
+| `404` JSON like `{"error":"Not found: GET /"}` | You hit the **API** project, not a front end. That's the Express 404 — it means the API is alive. |
+| First request after idle is slow | Serverless cold start. Normal. |
 
-To read errors: Vercel project → **Logs** → Runtime Logs, then trigger
-the request. `console.warn` and `console.error` from the API land there.
-
----
-
-## Recommended cleanup
-
-Neither blocks the demo, but both will bite you later.
-
-**1. `client/node_modules` is committed** — 3,865 files, ~39 MB, which
-is why `.git` is 142 MB. `.gitignore` lists `node_modules`, but ignore
-rules don't apply to files Git already tracks. Every Vercel build clones
-all of it. No native binaries are tracked, so builds should still
-succeed — but if the client build ever fails with a rolldown or esbuild
-binding error, this is the cause.
-
-```bash
-git rm -r --cached client/node_modules
-git commit -m "Stop tracking client/node_modules"
-```
-
-Your local files are untouched — `--cached` only updates the index.
-
-**2. `client/.env` and `admin/.env` are committed** with
-`VITE_API_URL=http://localhost:3000/api`. They hold no secrets (`VITE_`
-values ship in the bundle by design), and Vercel's dashboard variables
-take precedence over `.env` files, so your deploy works regardless. It's
-still a confusing trap:
-
-```bash
-git rm --cached client/.env admin/.env
-printf '\n.env\n' >> client/.gitignore
-printf '\n.env\n' >> admin/.gitignore
-git commit -m "Stop tracking front-end .env files"
-```
-
-The `.env.example` files are committed in their place.
+**Reading errors:** project → **Logs** → Runtime Logs (for API errors),
+or the failed deployment → **Build Logs** (for build errors).
+`console.warn` / `console.error` from the API land in Runtime Logs.
 
 ---
 
-## Before this becomes production
+## Part 9 — Email once you're ready
+
+Add the `SMTP_*`, `FROM_*`, `HOTEL_*` and `SITE_URL` variables to the
+**API** project, then redeploy. Full walkthrough in
+[docs/EMAIL_SETUP.md](docs/EMAIL_SETUP.md).
+
+One serverless difference is already handled in code but worth knowing.
+On a normal server the confirmation email is fired without `await` so
+the guest gets their code instantly. On serverless that's unsafe —
+Vercel can freeze the instance the moment you respond, so a detached
+promise silently never runs. `routes/bookings.js` therefore detects
+`process.env.VERCEL` and awaits the send, capped at 8 seconds
+(`EMAIL_TIMEOUT_MS`) so a hanging mail server can't stall the booking.
+SMTP connection pooling is disabled on serverless for the same reason.
+
+---
+
+## Part 10 — Before this is production
 
 - [ ] Custom domain on the client project
-- [ ] `ALLOW_VERCEL_PREVIEWS=false`, `CORS_ORIGINS` set to real domains
-- [ ] SMTP finished (`EMAIL_SETUP.md`) and `SITE_URL` set to the real domain
-- [ ] Admin dashboard access-restricted — it's publicly reachable, and
+- [ ] `ALLOW_VERCEL_PREVIEWS=false`; `CORS_ORIGINS` set to real domains
+- [ ] SMTP configured, `SITE_URL` pointing at the real domain
+- [ ] **Admin dashboard access-restricted** — it's publicly reachable and
       Supabase auth is the only thing in front of it. Consider Vercel
-      Password Protection or a Vercel Authentication rule.
+      Password Protection.
 - [ ] Supabase RLS policies reviewed against the live anon key
-- [ ] `server/.env` still untracked (`git ls-files | grep server/.env` returns nothing)
+- [ ] Tailwind moved off the CDN (`client/index.html` currently loads
+      `cdn.tailwindcss.com`, which warns in production)
+- [ ] Cancellation emails implemented if you need them
+- [ ] `git ls-files | grep -E "node_modules/|/\.env$"` returns nothing

@@ -1,35 +1,43 @@
-{
-  "name": "maisoncenter",
-  "version": "1.0.0",
-  "description": "Hotel Website",
-  "homepage": "https://github.com/404Temi/MaisonCenter#readme",
-  "bugs": {
-    "url": "https://github.com/404Temi/MaisonCenter/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/404Temi/MaisonCenter.git"
-  },
-  "license": "ISC",
-  "author": "",
-  "type": "commonjs",
-  "main": "server/index.js",
-  "scripts": {
-    "start": "node server/index.js",
-    "dev": "nodemon server/index.js",
-    "email:verify": "node server/scripts/test-email.js --verify",
-    "email:test": "node server/scripts/test-email.js",
-    "email:preview": "node server/scripts/test-email.js --verify --preview",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.108.2",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^5.2.1",
-    "nodemailer": "^9.0.5"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.14"
-  }
-}
+{
+  "name": "maisoncenter",
+  "version": "1.0.0",
+  "description": "Maison Center hotel platform — Express + Supabase API serving a customer booking site and a staff admin dashboard.",
+  "homepage": "https://github.com/404Temi/MaisonCenter#readme",
+  "bugs": {
+    "url": "https://github.com/404Temi/MaisonCenter/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/404Temi/MaisonCenter.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "server/index.js",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "nodemon server/index.js",
+    "email:verify": "node server/scripts/test-email.js --verify",
+    "email:test": "node server/scripts/test-email.js",
+    "email:preview": "node server/scripts/test-email.js --verify --preview",
+    "client:dev": "npm --prefix client run dev",
+    "client:build": "npm --prefix client run build",
+    "admin:dev": "npm --prefix admin run dev",
+    "admin:build": "npm --prefix admin run build",
+    "install:all": "npm install && npm --prefix client install && npm --prefix admin install",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.108.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^5.2.1",
+    "nodemailer": "^9.0.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}

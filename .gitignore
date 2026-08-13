@@ -1,27 +1,59 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# =====================================================================
+# Root .gitignore — covers server/, api/, client/ and admin/.
+#
+# NOTE: ignore rules do NOT apply to files Git already tracks. If
+# something listed here still shows up in `git status`, it was committed
+# before the rule existed — untrack it with `git rm --cached`.
+# See DEPLOY.md > "Pre-flight".
+# =====================================================================
 
-# dependencies
-/node_modules
-/.pnp
+# ----- dependencies --------------------------------------------------
+# No leading slash, so this matches at EVERY level (client/, admin/...).
+node_modules/
+.pnp
 .pnp.js
 
-# testing
-/coverage
+# ----- build output --------------------------------------------------
+dist/
+dist-ssr/
+build/
+.vite/
 
-# production
-/build
-
-# misc
-.DS_Store
+# ----- environment / secrets -----------------------------------------
+# server/.env holds the Supabase service role key and SMTP password.
+# The client/admin .env files hold no secrets (VITE_ vars ship in the
+# bundle) but are still local config, not repo config.
 .env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*.local
+!.env.example
 
-# local email render output from server/scripts/test-email.js --preview
+# ----- Supabase CLI --------------------------------------------------
+# Local CLI state (linked project ref, tool versions). Machine-specific.
+supabase/.temp/
+supabase/.branches/
+
+# ----- tooling / local output ----------------------------------------
+# Written by `npm run email:preview`.
 email-preview.html
+coverage/
+*.local
+.vercel
 
+# ----- logs ----------------------------------------------------------
+logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ----- editors / OS --------------------------------------------------
+.DS_Store
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

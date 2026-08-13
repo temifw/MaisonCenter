@@ -1,19 +1,20 @@
 # =====================================================================
-# .vercelignore — applies to the API project (root directory = repo root).
+# .vercelignore — applies to the API project only (Root Directory = .).
 #
-# The API function only needs server/ and api/. Excluding the two front
+# The API function needs just api/ and server/. Excluding the two front
 # ends keeps the upload small and the build fast; they deploy as their
-# own Vercel projects with their own root directories.
+# own Vercel projects with their own Root Directory settings, and this
+# file does not affect them.
 # =====================================================================
 
 client
 admin
 supabase
+docs
 node_modules
 
 *.md
-!DEPLOY.md
-
 .vscode
 .git
+.nvmrc
 email-preview.html
